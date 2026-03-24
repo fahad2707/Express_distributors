@@ -1,19 +1,9 @@
 /**
- * Runtime API proxy: forwards /api/* to the backend using BACKEND_URL from env.
- * This way the backend URL is read at request time on the server, so you only
- * need to set BACKEND_URL (or NEXT_PUBLIC_API_URL) in Render – no rebuild needed
- * for the URL to take effect (for server-side proxy).
+ * Runtime API proxy: forwards /api and /api/* to the backend using BACKEND_URL.
+ * Optional catch-all [[...path]] so /api alone is handled (required [...path] 404s on /api).
  */
 import { NextRequest, NextResponse } from 'next/server';
-
-function getBackendBase(): string {
-  // Server-side: prefer BACKEND_URL (no /api), then NEXT_PUBLIC_API_URL (with /api)
-  const base = process.env.BACKEND_URL?.trim();
-  if (base) return base.replace(/\/api\/?$/, '');
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (apiUrl) return apiUrl.replace(/\/api\/?$/, '');
-  return 'http://localhost:5001';
-}
+import { getBackendBaseForProxy } from '@/lib/backend-proxy-base';
 
 export async function GET(request: NextRequest, { params }: { params: { path?: string[] } }) {
   return proxy(request, params.path);
@@ -37,7 +27,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { path?
 
 async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   const segs = pathSegments ?? [];
-  const backendBase = getBackendBase();
+  const backendBase = getBackendBaseForProxy();
   const path = segs.length ? segs.join('/') : '';
   const url = new URL(request.url);
   const qs = url.searchParams.toString();
