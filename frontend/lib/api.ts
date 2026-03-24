@@ -1,16 +1,14 @@
 import axios from 'axios';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim()) || 'http://localhost:5001/api';
+import { resolveApiBaseUrl } from './api-base-url';
 
 const api = axios.create({
-  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add auth token to requests
 api.interceptors.request.use((config) => {
+  config.baseURL = resolveApiBaseUrl();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

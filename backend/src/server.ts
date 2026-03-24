@@ -90,7 +90,9 @@ const allowedOrigins = [
   'http://127.0.0.1:3001',
 ].filter(Boolean) as string[];
 const isAllowedOrigin = (origin: string) =>
-  allowedOrigins.includes(origin) || origin.includes('.onrender.com');
+  allowedOrigins.includes(origin) ||
+  origin.includes('.onrender.com') ||
+  origin.includes('.vercel.app');
 app.use(cors({
   origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
     if (!origin) return cb(null, true);
