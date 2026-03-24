@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
+import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 
 interface Customer {
@@ -171,13 +172,12 @@ export default function ReceivePaymentLightbox({ isOpen, onClose, onRecorded, pr
           setOutstandingInvoices(data.filter((inv: any) => (inv.payment_status || '').toLowerCase() === 'unpaid'));
         }
       }
-    } catch (e: any) {
-      const msg = e.response?.data?.error || '';
-      // Never show "deposit to bank account" requirement; bank account is optional.
-      if (typeof msg === 'string' && (msg.includes('Deposit to bank account') || msg.includes('deposited in'))) {
+    } catch (e: unknown) {
+      const msg = formatApiError(e, 'Failed to record payment');
+      if (msg.includes('Deposit to bank account') || msg.includes('deposited in')) {
         toast.error('Failed to record payment');
       } else {
-        toast.error(msg || 'Failed to record payment');
+        toast.error(msg);
       }
     } finally {
       setSaving(false);

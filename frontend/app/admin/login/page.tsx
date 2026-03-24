@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import adminApi from '@/lib/admin-api';
+import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 
 export default function AdminLoginPage() {
@@ -20,12 +21,12 @@ export default function AdminLoginPage() {
       localStorage.setItem('adminToken', response.data.token);
       toast.success('Login successful!');
       router.push('/admin/dashboard');
-    } catch (error: any) {
-      const msg = error.response?.data?.error || error.message;
-      if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error') || !error.response) {
+    } catch (error: unknown) {
+      const ax = error as { code?: string; message?: string; response?: unknown };
+      if (ax.code === 'ECONNREFUSED' || ax.message?.includes('Network Error') || !ax.response) {
         toast.error('Cannot reach server. Is the backend running? Start it with: npm run dev (from project root)');
       } else {
-        toast.error(msg);
+        toast.error(formatApiError(error, 'Login failed'));
       }
     } finally {
       setLoading(false);
@@ -79,7 +80,7 @@ export default function AdminLoginPage() {
           Default: admin@edinc.com / Admin1234
         </p>
         <p className="mt-1 text-center text-xs text-gray-400">
-          If login or website fails, run backend and seed — see FIX_LOGIN_AND_PRODUCTS.md
+          If login fails, confirm the backend is up and Vercel has BACKEND_URL set to your Railway URL.
         </p>
       </div>
     </div>

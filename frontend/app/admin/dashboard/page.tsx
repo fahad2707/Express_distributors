@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { DollarSign, ShoppingCart, TrendingUp, Wallet, ClipboardList, Tag, AlertTriangle } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
+import { toDisplayText } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -76,7 +77,7 @@ export default function AdminDashboard() {
     { title: 'Net Profit', value: `$${Number(data.netProfit ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: DollarSign, color: 'text-emerald-700' },
     { title: 'Total Receivable', value: `$${Number(data.totalReceivable ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Wallet, color: 'text-amber-600' },
     { title: 'Total Payable', value: `$${Number(data.totalPayable ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: ClipboardList, color: 'text-gray-600' },
-    { title: 'Top Selling Item', value: data.topSellingItem || '—', icon: Tag, color: 'text-teal-600' },
+    { title: 'Top Selling Item', value: toDisplayText(data.topSellingItem), icon: Tag, color: 'text-teal-600' },
   ];
 
   return (
