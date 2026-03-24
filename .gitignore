@@ -1,0 +1,14 @@
+node_modules
+.env
+.env.local
+.env.*.local
+.next
+dist
+backend/dist
+coverage
+.DS_Store
+uploads
+*.pem
+
+# Local data (do not publish)
+Asif badat.xlsx

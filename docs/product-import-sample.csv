@@ -1,0 +1,6 @@
+name,slug,description,price,cost_price,category_slug,image_url,barcode,plu,sku,stock_quantity,low_stock_threshold,tax_rate,is_active
+"Wireless Bluetooth Earbuds",,"Noise cancelling wireless earbuds with 24hr battery",49.99,25.00,electronics,,ELEC101,,SKU-ELEC101,100,10,0,1
+"Organic Green Tea 100g",,"Premium loose leaf green tea",12.99,5.50,health-beauty,,,102,SKU-TEA102,200,20,0,1
+"Office Notebook A4",,"Pack of 3 ruled notebooks 80 pages",8.99,3.20,office-supplies,,OFFICE101,,SKU-NB101,150,15,8.5,1
+"Running Shoes Pro",,"Lightweight running shoes size 7-11",79.99,42.00,clothing,,CLOTH101,,SKU-SHOE101,60,5,0,1
+"Garden Hose 50ft",,"Expandable garden hose with spray nozzle",34.99,18.00,home-garden,,HOME101,,SKU-HOSE101,45,10,0,1
