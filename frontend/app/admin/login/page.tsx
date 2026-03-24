@@ -80,7 +80,7 @@ export default function AdminLoginPage() {
           Default: admin@edinc.com / Admin1234
         </p>
         <p className="mt-1 text-center text-xs text-gray-400">
-          If login fails, confirm the backend is up and Vercel has BACKEND_URL set to your Railway URL.
+          Production: set BACKEND_URL on Vercel to your Railway host (with or without https://).
         </p>
       </div>
     </div>

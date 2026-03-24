@@ -1,11 +1,31 @@
 /**
- * Origin of the backend (no trailing path) for server-side proxies.
+ * fetch() requires a full URL with a scheme. Vercel env is often pasted without https://,
+ * which makes fetch throw and the proxy return 502.
+ */
+export function ensureFetchOriginForBackend(raw: string): string {
+  const t = raw.trim();
+  if (!t) return t;
+  if (/^https?:\/\//i.test(t)) return t.replace(/\/+$/, '');
+  if (/^(localhost|127\.0\.0\.1)([:/]|$)/i.test(t)) {
+    return `http://${t}`.replace(/\/+$/, '');
+  }
+  return `https://${t}`.replace(/\/+$/, '');
+}
+
+/**
+ * Origin of the backend (no /api path) for server-side proxies.
  * Prefer BACKEND_URL on Vercel; fall back to NEXT_PUBLIC_API_URL; then local dev.
  */
 export function getBackendBaseForProxy(): string {
   const base = process.env.BACKEND_URL?.trim();
-  if (base) return base.replace(/\/+$/, '').replace(/\/api\/?$/, '');
+  if (base) {
+    const stripped = base.replace(/\/+$/, '').replace(/\/api\/?$/i, '');
+    return ensureFetchOriginForBackend(stripped);
+  }
   const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (apiUrl) return apiUrl.replace(/\/+$/, '').replace(/\/api\/?$/, '');
+  if (apiUrl) {
+    const stripped = apiUrl.replace(/\/+$/, '').replace(/\/api\/?$/i, '');
+    return ensureFetchOriginForBackend(stripped);
+  }
   return 'http://localhost:5001';
 }
