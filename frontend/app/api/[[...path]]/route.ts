@@ -36,22 +36,33 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   const headers: Record<string, string> = {};
   request.headers.forEach((value, key) => {
     const lower = key.toLowerCase();
-    if (lower === 'host' || lower === 'connection') return;
+    if (
+      lower === 'host' ||
+      lower === 'connection' ||
+      lower === 'content-length' ||
+      lower === 'transfer-encoding'
+    ) {
+      return;
+    }
     headers[key] = value;
   });
 
-  let body: string | undefined;
-  try {
-    body = await request.text();
-  } catch {
-    body = undefined;
+  const method = request.method.toUpperCase();
+  let body: ArrayBuffer | undefined;
+  if (method !== 'GET' && method !== 'HEAD') {
+    try {
+      const buf = await request.arrayBuffer();
+      body = buf.byteLength ? buf : undefined;
+    } catch {
+      body = undefined;
+    }
   }
 
   try {
     const res = await fetch(target, {
       method: request.method,
       headers,
-      body: body || undefined,
+      body: body !== undefined ? body : undefined,
     });
 
     const responseHeaders = new Headers();

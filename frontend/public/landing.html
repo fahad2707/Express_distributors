@@ -364,7 +364,7 @@ footer{padding:60px 56px 30px;border-top:1px solid var(--line2)}
 <div class="ticker"><div class="ticker-track"><div class="tick">Premium Quality<span class="tick-sep"></span></div><div class="tick">Express Delivery<span class="tick-sep"></span></div><div class="tick">500+ Partners<span class="tick-sep"></span></div><div class="tick">12+ Years Experience<span class="tick-sep"></span></div><div class="tick">On-Time Delivery<span class="tick-sep"></span></div><div class="tick">Quality Assured<span class="tick-sep"></span></div><div class="tick">Fast Dispatch<span class="tick-sep"></span></div><div class="tick">1.3K+ Products<span class="tick-sep"></span></div><div class="tick">Premium Quality<span class="tick-sep"></span></div><div class="tick">Express Delivery<span class="tick-sep"></span></div><div class="tick">500+ Partners<span class="tick-sep"></span></div><div class="tick">12+ Years Experience<span class="tick-sep"></span></div><div class="tick">On-Time Delivery<span class="tick-sep"></span></div><div class="tick">Quality Assured<span class="tick-sep"></span></div><div class="tick">Fast Dispatch<span class="tick-sep"></span></div><div class="tick">1.3K+ Products<span class="tick-sep"></span></div></div></div>
 <section id="highlights"><div class="hl-head"><h2 class="rv">Our <i>Premier</i><br/>Product Lines</h2><p class="rv">A curated selection across industries, maintained to the highest standards.</p></div><div class="hl-scene"><div class="hl-wheel" id="hlWheel"></div></div><div class="hl-ctrl rv"><button class="hl-btn" id="hlPrev">←</button><div class="hl-dots" id="hlDots"></div><button class="hl-btn" id="hlNext">→</button></div></section>
 <div style="height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)"></div>
-<section id="shop"><div class="shop-head rv"><div class="about-tag">Browse &amp; Buy</div><h2><i>All</i> Products</h2><p>Explore our complete catalog. Quality-assured, competitively priced, ready to ship.</p></div><div class="shop-search rv"><input id="shopSearch" type="text" placeholder="Search products by name, description, SKU, or category..."></div><div class="filters rv" id="filtBar"><button class="filt on" data-c="All">All</button></div><div class="pgrid" id="pgrid"></div><div class="load-row" id="loadRow"><button class="btn-ghost" id="loadBtn">Load More →</button></div><div id="shopLoading" style="text-align:center;padding:40px 0;display:none"><div style="display:inline-block;width:28px;height:28px;border:2px solid var(--gold);border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite"></div><p style="margin-top:10px;font-size:12px;color:var(--fog)">Loading products…</p></div></section>
+<section id="shop"><div class="shop-head rv"><div class="about-tag">Browse &amp; Buy</div><h2><i>All</i> Products</h2><p>Explore our complete catalog. Quality-assured, competitively priced, ready to ship.</p></div><div class="shop-search rv"><input id="shopSearch" type="text" placeholder="Search products by name, description, SKU, or category..."></div><div class="filters rv" id="filtBar"><button class="filt on" data-c="All" data-id="">All</button></div><div class="pgrid" id="pgrid"></div><div class="load-row" id="loadRow"><button class="btn-ghost" id="loadBtn">Load More →</button></div><div id="shopLoading" style="text-align:center;padding:40px 0;display:none"><div style="display:inline-block;width:28px;height:28px;border:2px solid var(--gold);border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite"></div><p style="margin-top:10px;font-size:12px;color:var(--fog)">Loading products…</p></div></section>
 <div style="height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)"></div>
 <section id="about"><div class="rvl"><div class="about-tag">Who We Are</div><h2 class="about-h2">Where <i>precision</i><br/>meets purpose</h2><p class="about-body">Express Distributors Inc. has been the silent engine behind hundreds of thriving businesses. We source, warehouse, and deliver products across every major industry — with meticulous attention to quality and timing.</p><div class="stat-grid"><div class="stat"><div class="stat-v">12+</div><div class="stat-k">Years Active</div></div><div class="stat"><div class="stat-v">500+</div><div class="stat-k">Client Partners</div></div><div class="stat"><div class="stat-v">98%</div><div class="stat-k">On-Time Rate</div></div><div class="stat"><div class="stat-v">1.3K+</div><div class="stat-k">Products Listed</div></div></div></div><div class="about-art-wrap rvr"><div class="about-mosaic" id="mosaic"></div><div class="about-float"><div class="af-lbl">Active Partners</div><div class="af-val">500+</div></div></div></section>
 <div style="height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)"></div>
@@ -475,7 +475,7 @@ function buildHighlights(cats){
   if(!wheel||!hlDotsEl)return;
   wheel.innerHTML='';hlDotsEl.innerHTML='';
   hlData=Array.isArray(cats)?cats.slice(0,7).map((c,i)=>({cat:c.name||'Category',desc:(c.description||'Quality products in '+(c.name||'')).replace(/'/g,"\\'"),price:'View All',glow:pickGlow(i),catId:c.id||'',image_url:c.image_url||''})):[];
-  if(hlData.length===0)hlData=[{cat:'Products',desc:'Browse our catalog',price:'Shop Now',glow:'#BFA06A',catId:''}];
+  if(hlData.length===0)hlData=[{cat:'All',desc:'Browse our catalog',price:'Shop Now',glow:'#BFA06A',catId:''}];
   HN=hlData.length;STEP_DEG=360/HN;curAngle=0;curIdx=0;
   hlData.forEach((d,i)=>{
     const card=document.createElement('div');
@@ -489,9 +489,10 @@ function buildHighlights(cats){
     const hlAddBtn=card.querySelector('.hl-add');
     if(hlAddBtn){
       hlAddBtn.addEventListener('click',()=>{
-        actFilt=d.cat;
+        actFilt=d.catId?d.cat:'All';
+        actFiltCatId=d.catId||'';
         visCount=24;
-        document.querySelectorAll('.filt').forEach(x=>{x.classList.toggle('on',x.dataset.c===actFilt);});
+        syncFiltBarOnState();
         renderShop();
         const shopEl=document.getElementById('shop');
         if(shopEl) shopEl.scrollIntoView({behavior:'smooth'});
@@ -500,27 +501,52 @@ function buildHighlights(cats){
     const dot=document.createElement('button');
     dot.className='hl-dot';
     dot.setAttribute('aria-label','Show '+d.cat);
-    dot.addEventListener('click',()=>goToIdx(i));
+    dot.addEventListener('click',()=>goToIdx(i,true));
     hlDotsEl.appendChild(dot);
   });
   applyHighlightSizing();positionCards();spinWheel(false);
 }
 function positionCards(){const r=getRadius();hlData.forEach((_,i)=>{const card=document.getElementById('hlc'+i);if(card)card.style.transform='rotateY('+i*STEP_DEG+'deg) translateZ('+r+'px)';});}
 function spinWheel(animate){if(!HN||!wheel||!hlDotsEl)return;wheel.style.transition=animate?'transform .75s cubic-bezier(.4,0,.2,1)':'none';wheel.style.transform='rotateY('+(-curAngle)+'deg)';hlData.forEach((_,i)=>{const face=document.querySelector('#hlc'+i+' .hl-card-face');if(!face)return;face.style.borderColor=i===curIdx?'rgba(191,160,106,.35)':'';face.style.boxShadow=i===curIdx?'0 24px 72px rgba(0,0,0,.55),0 0 40px rgba(191,160,106,.1)':'';});hlDotsEl.querySelectorAll('.hl-dot').forEach((d,i)=>d.classList.toggle('on',i===curIdx));}
-function goToIdx(t){if(!HN)return;let diff=t-curIdx;if(diff>HN/2)diff-=HN;if(diff<-HN/2)diff+=HN;curAngle+=diff*STEP_DEG;curIdx=((t%HN)+HN)%HN;spinWheel(true);}
-function goNext(){if(!HN)return;curAngle+=STEP_DEG;curIdx=(curIdx+1)%HN;spinWheel(true);}
-function goPrev(){if(!HN)return;curAngle-=STEP_DEG;curIdx=(curIdx-1+HN)%HN;spinWheel(true);}
+function syncFiltBarOnState(){
+  document.querySelectorAll('.filt').forEach(x=>{
+    const isAll=(actFilt==='All'&&!actFiltCatId);
+    const on=isAll?(x.dataset.c==='All'):(x.dataset.id===actFiltCatId);
+    x.classList.toggle('on',!!on);
+  });
+}
+function applyWheelHighlightToShop(fromUser){
+  if(!fromUser||!hlData.length)return;
+  const d=hlData[curIdx];
+  if(!d)return;
+  if(d.catId){
+    actFilt=d.cat;
+    actFiltCatId=d.catId;
+  }else if(d.cat==='All'){
+    actFilt='All';
+    actFiltCatId='';
+  }else{
+    actFilt=d.cat;
+    actFiltCatId='';
+  }
+  visCount=24;
+  syncFiltBarOnState();
+  renderShop();
+}
+function goToIdx(t,fromUser){if(!HN)return;let diff=t-curIdx;if(diff>HN/2)diff-=HN;if(diff<-HN/2)diff+=HN;curAngle+=diff*STEP_DEG;curIdx=((t%HN)+HN)%HN;spinWheel(true);applyWheelHighlightToShop(!!fromUser);}
+function goNext(fromUser){if(!HN)return;curAngle+=STEP_DEG;curIdx=(curIdx+1)%HN;spinWheel(true);applyWheelHighlightToShop(!!fromUser);}
+function goPrev(fromUser){if(!HN)return;curAngle-=STEP_DEG;curIdx=(curIdx-1+HN)%HN;spinWheel(true);applyWheelHighlightToShop(!!fromUser);}
 const hlNext=document.getElementById('hlNext'),hlPrev=document.getElementById('hlPrev');
-if(hlNext) hlNext.addEventListener('click',goNext); if(hlPrev) hlPrev.addEventListener('click',goPrev);
-let hlAuto=setInterval(goNext,3600),hlWheelHover=false;
-function startHlAuto(){clearInterval(hlAuto);hlAuto=setInterval(goNext,3600);}
+if(hlNext) hlNext.addEventListener('click',()=>goNext(true)); if(hlPrev) hlPrev.addEventListener('click',()=>goPrev(true));
+let hlAuto=setInterval(()=>goNext(false),3600),hlWheelHover=false;
+function startHlAuto(){clearInterval(hlAuto);hlAuto=setInterval(()=>goNext(false),3600);}
 function stopHlAuto(){clearInterval(hlAuto);}
 if(wheel){wheel.addEventListener('mouseenter',()=>{hlWheelHover=true;stopHlAuto();});wheel.addEventListener('mouseleave',()=>{hlWheelHover=false;startHlAuto();});}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopHlAuto();else if(!hlWheelHover)startHlAuto();});
 window.addEventListener('resize',()=>{applyHighlightSizing();positionCards();spinWheel(false);});
 
 let PRODS=[],ALL_CATEGORIES=[],MIXED_ALL=[];
-let visCount=24,actFilt='All',searchQuery='';
+let visCount=24,actFilt='All',actFiltCatId='',searchQuery='';
 function shuffleProducts(list){
   const arr=[...list];
   for(let i=arr.length-1;i>0;i--){
@@ -537,7 +563,14 @@ function normCode(v){
   return normText(v).replace(/[^a-z0-9]/g,'');
 }
 const getFiltered=()=>{
-  const source=actFilt==='All'?MIXED_ALL:PRODS.filter(p=>p.c===actFilt);
+  let source;
+  if(actFilt==='All'&&!actFiltCatId){
+    source=MIXED_ALL;
+  }else if(actFiltCatId){
+    source=PRODS.filter(p=>p.cid===actFiltCatId);
+  }else{
+    source=PRODS.filter(p=>normText(p.c)===normText(actFilt));
+  }
   if(!searchQuery) return source;
   const q=normText(searchQuery);
   const qCode=normCode(searchQuery);
@@ -579,7 +612,7 @@ function renderShop(){
   if(loadBtn) loadBtn.style.display=filtered.length>visCount?'block':'none';
 }
 
-document.getElementById('filtBar').addEventListener('click',e=>{const b=e.target.closest('.filt');if(!b)return;document.querySelectorAll('.filt').forEach(x=>x.classList.remove('on'));b.classList.add('on');actFilt=b.dataset.c;visCount=24;renderShop();});
+document.getElementById('filtBar').addEventListener('click',e=>{const b=e.target.closest('.filt');if(!b)return;document.querySelectorAll('.filt').forEach(x=>x.classList.remove('on'));b.classList.add('on');actFilt=b.dataset.c||'All';actFiltCatId=b.dataset.id||'';visCount=24;renderShop();});
 document.getElementById('loadBtn').addEventListener('click',()=>{visCount+=12;renderShop();});
 document.getElementById('shopSearch').addEventListener('input',e=>{searchQuery=(e.target.value||'').trim();visCount=24;renderShop();});
 
@@ -598,16 +631,18 @@ async function loadData(){
     const products=Array.isArray(prodRes?.products)?prodRes.products:[];
     PRODS=products.map((p,i)=>({
       id:p.id,n:p.name||'',d:p.description||'',c:p.category_name||'Uncategorized',
+      cid:p.category_id||'',
       p:Number(p.price)||0,image_url:p.image_url||'',g:pickGlow(i),
       stock_quantity:p.stock_quantity,sku:p.sku,tax_rate:Number(p.tax_rate)||0
     }));
     MIXED_ALL=shuffleProducts(PRODS);
     if(filtBar){
-      filtBar.innerHTML='<button class="filt on" data-c="All">All</button>';
+      filtBar.innerHTML='<button class="filt on" data-c="All" data-id="">All</button>';
       ALL_CATEGORIES.forEach(cat=>{
         const btn=document.createElement('button');
         btn.className='filt';
         btn.dataset.c=cat.name||'';
+        btn.dataset.id=cat.id||'';
         btn.textContent=cat.name||'';
         filtBar.appendChild(btn);
       });
@@ -618,7 +653,7 @@ async function loadData(){
     console.error('Landing loadData:',err);
     PRODS=[]; ALL_CATEGORIES=[];
     buildHighlights([]);
-    if(filtBar) filtBar.innerHTML='<button class="filt on" data-c="All">All</button>';
+    if(filtBar) filtBar.innerHTML='<button class="filt on" data-c="All" data-id="">All</button>';
     if(pgrid) pgrid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--fog)"><p style="font-size:16px">Unable to load products</p><p style="font-size:12px;margin-top:8px">Please refresh or try again later.</p></div>';
     else renderShop();
   }finally{

@@ -69,7 +69,7 @@ export default function NewProductPage() {
     try {
       const fd = new FormData();
       fd.append('image', file);
-      const { data } = await uploadApi.post<{ url: string }>('/upload/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const { data } = await uploadApi.post<{ url: string }>('/upload/image', fd);
       setForm((f) => ({ ...f, image_url: data.url }));
       setImagePreview(data.url);
       toast.success('Image uploaded');

@@ -448,7 +448,7 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
         for (let i = 0; i < fileInput.files.length; i++) {
           const formData = new FormData();
           formData.append('file', fileInput.files[i]);
-          await adminApi.post(`/customers/${created.id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+          await adminApi.post(`/customers/${created.id}/documents`, formData);
         }
       }
       setAddCustomerOpen(false);

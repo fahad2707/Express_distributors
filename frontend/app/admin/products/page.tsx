@@ -102,9 +102,7 @@ export default function ProductsPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const { data } = await uploadApi.post<ImportPreviewResult>('/products/import/preview', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await uploadApi.post<ImportPreviewResult>('/products/import/preview', formData);
       setPreview(data);
       toast.success('Preview ready. Review and confirm to import.');
     } catch (err: any) {
@@ -121,9 +119,7 @@ export default function ProductsPage() {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      const { data } = await uploadApi.post<ImportExecuteResult>('/products/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await uploadApi.post<ImportExecuteResult>('/products/import', formData);
       setImportResult(data);
       setImportStep('done');
       if (data.imported > 0) {

@@ -118,9 +118,7 @@ export default function CatalogPage() {
     try {
       const fd = new FormData();
       fd.append('image', file);
-      const res = await uploadApi.post('/categories/upload-image', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await uploadApi.post('/categories/upload-image', fd);
       const url = res.data?.url || '';
       if (!url) throw new Error('No URL returned');
       setForm((f) => ({ ...f, image_url: url }));

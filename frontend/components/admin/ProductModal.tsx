@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import adminApi, { uploadApi } from '@/lib/admin-api';
+import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 
 const ADD_CATEGORY = '__add_category__';
@@ -74,13 +75,11 @@ function AddCategoryModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     try {
       const form = new FormData();
       form.append('image', file);
-      const response = await uploadApi.post('/categories/upload-image', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await uploadApi.post('/categories/upload-image', form);
       setImageUrl(response.data?.url || '');
       toast.success('Category image uploaded');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to upload category image');
+    } catch (err: unknown) {
+      toast.error(formatApiError(err, 'Failed to upload category image'));
     } finally {
       setUploadingImage(false);
     }
@@ -463,13 +462,13 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
     try {
       const form = new FormData();
       form.append('image', file);
-      const response = await uploadApi.post('/upload/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const response = await uploadApi.post('/upload/image', form);
       const imageUrl = response.data.url;
       setFormData((f) => ({ ...f, image_url: imageUrl }));
       setImagePreview(imageUrl);
       toast.success('Image uploaded');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Upload failed');
+    } catch (err: unknown) {
+      toast.error(formatApiError(err, 'Upload failed'));
     } finally {
       setUploading(false);
     }

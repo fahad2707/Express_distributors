@@ -92,9 +92,7 @@ export default function SupplierDetailPage() {
         const file = files[i];
         const form = new FormData();
         form.append('file', file);
-        const res = await uploadApi.post(`/vendors/${supplier.id}/documents`, form, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const res = await uploadApi.post(`/vendors/${supplier.id}/documents`, form);
         docs.push(...(res.data.documents || []));
       }
       setSupplier((prev) => (prev ? { ...prev, documents: docs } : prev));

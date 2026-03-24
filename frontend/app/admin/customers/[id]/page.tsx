@@ -157,7 +157,7 @@ export default function CustomerDetailPage() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      await adminApi.post(`/customers/${id}/documents`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await adminApi.post(`/customers/${id}/documents`, fd);
       toast.success('Document uploaded');
       fetchCustomer();
     } catch (err: any) {

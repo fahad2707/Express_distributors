@@ -126,7 +126,7 @@ export default function CustomersPage() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      await adminApi.post(`/customers/${customerId}/documents`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await adminApi.post(`/customers/${customerId}/documents`, fd);
       toast.success('Document uploaded');
       await refreshDetailCustomer(customerId);
     } catch (err: any) {
@@ -173,7 +173,7 @@ export default function CustomersPage() {
           for (let i = 0; i < fileInput.files.length; i++) {
             const fd = new FormData();
             fd.append('file', fileInput.files[i]);
-            await adminApi.post(`/customers/${created.id}/documents`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            await adminApi.post(`/customers/${created.id}/documents`, fd);
           }
         }
         if (fileInput) fileInput.value = '';
