@@ -24,7 +24,17 @@ function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
   const endpoint = String(config.url || '');
   if (typeof window !== 'undefined' && endpoint.includes('/products/assign-categories-csv')) {
     const direct = process.env.NEXT_PUBLIC_API_URL?.trim();
-    if (direct) config.baseURL = direct.replace(/\/+$/, '');
+    if (direct) {
+      let d = direct.replace(/\/+$/, '');
+      // Axios/fetch require scheme. Users often paste env without https://.
+      if (!/^https?:\/\//i.test(d)) {
+        if (/^(localhost|127\.0\.0\.1)(:|$)/i.test(d)) d = `http://${d}`;
+        else d = `https://${d}`;
+      }
+      // Ensure we end at ".../api" since axios call is "/products/..."
+      if (!/\/api\/?$/i.test(d)) d = `${d}/api`;
+      config.baseURL = d;
+    }
   }
   const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
   if (token) {
