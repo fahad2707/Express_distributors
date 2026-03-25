@@ -45,8 +45,15 @@ export type CsvAssignRow = {
 
 export type LeanCat = { _id: mongoose.Types.ObjectId; name: string; slug: string };
 
+/** Normalize fancy hyphens so two-token parsing matches CSV variants. */
+function normalizeCsvCategorySlug(raw: string): string {
+  return String(raw ?? '')
+    .trim()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
+}
+
 function twoTokenPrefix(categorySlug: string): string {
-  const s = (categorySlug || '').trim();
+  const s = normalizeCsvCategorySlug(categorySlug);
   const parts = s.split('-').filter(Boolean);
   if (parts.length >= 2) return `${parts[0]}-${parts[1]}`;
   return s;
@@ -88,40 +95,61 @@ export function normSkuBar(raw: string | undefined): string {
   return t;
 }
 
-export function resolveCategoryId(hints: string[], cats: LeanCat[]): mongoose.Types.ObjectId | null {
+/**
+ * Pick best Category for CSV hints. Uses scores so short slug prefixes (e.g. "wi")
+ * do not steal matches, and name substring "winter" does not hit "wintergreen" categories.
+ */
+export function resolveCategoryId(
+  hints: string[],
+  cats: LeanCat[],
+  csvTwoTokenKey: string = ''
+): mongoose.Types.ObjectId | null {
+  if (!cats.length) return null;
+
   const norm = (s: string) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const sortedHints = [...hints].map(norm).filter((hn) => hn.length >= 2).sort((a, b) => b.length - a.length);
+  const hintNorms = [...new Set(hints.map(norm).filter((h) => h.length >= 2))].sort((a, b) => b.length - a.length);
+  const twoNorm = csvTwoTokenKey ? norm(csvTwoTokenKey) : '';
 
-  for (const hn of sortedHints) {
-    const exact = cats.find((x) => {
-      const sn = norm(x.slug);
-      return sn.length > 0 && sn === hn;
-    });
-    if (exact) return exact._id;
+  const isWinterNoiseName = (nn: string, hn: string) =>
+    hn === 'winter' && (nn.includes('wintergreen') || nn.includes('winterfresh'));
 
-    const slugPrefix = cats.find((x) => {
-      const sn = norm(x.slug);
-      if (!sn) return false;
-      return sn.startsWith(hn) || hn.startsWith(sn);
-    });
-    if (slugPrefix) return slugPrefix._id;
+  let bestId: mongoose.Types.ObjectId | null = null;
+  let bestScore = 0;
+  let bestSlugLen = 0;
 
-    const nameHas = cats.find((x) => {
-      const nn = norm(x.name);
-      if (!nn) return false;
-      return nn.includes(hn);
-    });
-    if (nameHas) return nameHas._id;
+  for (const c of cats) {
+    const sn = norm(c.slug);
+    const nn = norm(c.name);
+    let catScore = 0;
 
-    if (hn.length >= 4) {
-      const slugHas = cats.find((x) => {
-        const sn = norm(x.slug);
-        return sn.length > 0 && sn.includes(hn);
-      });
-      if (slugHas) return slugHas._id;
+    if (twoNorm && sn && sn === twoNorm) {
+      catScore = 1000;
+    } else {
+      for (const hn of hintNorms) {
+        let s = 0;
+        if (sn && sn === hn) s = 950;
+        else if (sn && hn.length >= 4 && sn.startsWith(hn)) s = 450 + hn.length;
+        else if (sn && sn.length >= 4 && hn.length >= 4 && hn.startsWith(sn)) s = 430 + sn.length;
+        else if (sn && hn.length >= 4 && sn.includes(hn)) s = 350;
+        else if (nn && hn.length >= 6 && nn.includes(hn)) {
+          if (isWinterNoiseName(nn, hn)) s = 0;
+          else s = 220;
+        } else if (nn && hn.length >= 4 && nn.includes(hn)) {
+          if (isWinterNoiseName(nn, hn)) s = 0;
+          else s = 130;
+        }
+        if (s > catScore) catScore = s;
+      }
+    }
+
+    if (catScore > bestScore || (catScore === bestScore && catScore > 0 && sn.length > bestSlugLen)) {
+      bestScore = catScore;
+      bestId = c._id;
+      bestSlugLen = sn.length;
     }
   }
-  return null;
+
+  return bestScore > 0 ? bestId : null;
 }
 
 type ProductLean = {
@@ -182,8 +210,10 @@ export async function assignCategoriesFromCsvRows(rows: CsvAssignRow[], dryRun: 
   const unresolvedHints = new Set<string>();
 
   for (const row of rows) {
-    const hints = hintsForCategorySlug((row.category_slug || '').trim());
-    const catId = resolveCategoryId(hints, cats);
+    const rowCatSlug = normalizeCsvCategorySlug(String(row.category_slug || '').trim());
+    const twoKey = twoTokenPrefix(rowCatSlug);
+    const hints = hintsForCategorySlug(rowCatSlug);
+    const catId = resolveCategoryId(hints, cats, twoKey);
     if (!catId) {
       skippedNoCategory++;
       hints.forEach((h) => unresolvedHints.add(h));
