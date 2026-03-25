@@ -14,6 +14,10 @@ export const uploadApi = axios.create({
 
 function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
   config.baseURL = resolveApiBaseUrl();
+  // Default instance sets Content-Type: json — that breaks multipart (multer sees no file).
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

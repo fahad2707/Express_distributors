@@ -9,6 +9,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   config.baseURL = resolveApiBaseUrl();
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
