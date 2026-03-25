@@ -18,6 +18,14 @@ function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
     delete config.headers['Content-Type'];
   }
+  // The CSV category assignment can take long enough that Vercel's /api proxy
+  // may time out (resulting in 503). For this specific endpoint, bypass the
+  // proxy and hit Railway directly via NEXT_PUBLIC_API_URL.
+  const endpoint = String(config.url || '');
+  if (typeof window !== 'undefined' && endpoint.includes('/products/assign-categories-csv')) {
+    const direct = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (direct) config.baseURL = direct.replace(/\/+$/, '');
+  }
   const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
