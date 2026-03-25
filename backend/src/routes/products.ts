@@ -3,6 +3,7 @@ import multer from 'multer';
 import mongoose from 'mongoose';
 import Product from '../models/Product';
 import Category from '../models/Category';
+import SubCategory from '../models/SubCategory';
 import { authenticateAdmin, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
 import { buildPreview, executeImport } from '../services/productImportService';
@@ -412,6 +413,57 @@ router.post('/bulk-delete', authenticateAdmin, async (req: AuthRequest, res) => 
     if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
     console.error('Bulk delete products error:', error);
     res.status(500).json({ error: 'Failed to delete products' });
+  }
+});
+
+// Admin: Assign category (and optional subcategory) to many products at once
+router.post('/bulk-assign-category', authenticateAdmin, async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      ids: z.array(z.string()).min(1),
+      category_id: z.string().min(1),
+      sub_category_id: z.string().optional(),
+    });
+    const { ids, category_id, sub_category_id } = schema.parse(req.body);
+
+    const catOid = toObjectIdOrUndefined(category_id);
+    if (!catOid) return res.status(400).json({ error: 'Invalid category_id' });
+    const category = await Category.findById(catOid).lean();
+    if (!category) return res.status(400).json({ error: 'Category not found' });
+
+    const validIds = ids.filter((id) => /^[a-f0-9A-F]{24}$/.test(id));
+    if (validIds.length === 0) return res.status(400).json({ error: 'No valid product IDs' });
+
+    const update: Record<string, unknown> = { category_id: catOid, updated_at: new Date() };
+    const unset: Record<string, 1> = {};
+
+    const subTrim = sub_category_id?.trim();
+    if (subTrim) {
+      const subOid = toObjectIdOrUndefined(subTrim);
+      if (!subOid) return res.status(400).json({ error: 'Invalid sub_category_id' });
+      const sub = await SubCategory.findById(subOid).lean();
+      if (!sub) return res.status(400).json({ error: 'Subcategory not found' });
+      if (String(sub.category_id) !== String(catOid)) {
+        return res.status(400).json({ error: 'Subcategory does not belong to the selected category' });
+      }
+      update.sub_category_id = subOid;
+    } else {
+      unset.sub_category_id = 1;
+    }
+
+    const mongoUpdate: mongoose.UpdateQuery<any> = { $set: update };
+    if (Object.keys(unset).length) mongoUpdate.$unset = unset;
+
+    const result = await Product.updateMany({ _id: { $in: validIds } }, mongoUpdate);
+    res.json({
+      message: `Updated ${result.modifiedCount} product(s)`,
+      modified: result.modifiedCount,
+      matched: result.matchedCount,
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
+    console.error('Bulk assign category error:', error);
+    res.status(500).json({ error: 'Failed to assign category' });
   }
 });
 

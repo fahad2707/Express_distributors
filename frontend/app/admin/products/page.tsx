@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit, Trash2, Search, Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, FileDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, FileDown, Layers } from 'lucide-react';
 import adminApi, { uploadApi } from '@/lib/admin-api';
+import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 import ProductModal from '@/components/admin/ProductModal';
 
@@ -13,6 +14,7 @@ interface Product {
   stock_quantity: number;
   low_stock_threshold?: number;
   barcode?: string;
+  category_id?: string;
   category_name?: string;
   image_url?: string;
   is_active: boolean;
@@ -20,6 +22,17 @@ interface Product {
   description?: string;
   cost_price?: number;
   tax_rate?: number;
+}
+
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+interface SubCategoryOption {
+  id: string;
+  name: string;
+  category_id: string;
 }
 
 interface PreviewRow {
@@ -71,6 +84,11 @@ export default function ProductsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'out_of_stock'>('all');
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCategoryOption[]>([]);
+  const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [bulkSubId, setBulkSubId] = useState('');
+  const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const fetchProducts = async () => {
     try {
@@ -84,8 +102,30 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchTaxonomy = async () => {
+    try {
+      const [catRes, subRes] = await Promise.all([
+        adminApi.get('/categories'),
+        adminApi.get('/sub-categories'),
+      ]);
+      const cats = Array.isArray(catRes.data) ? catRes.data : [];
+      setCategories(cats.map((c: { id?: string; name?: string }) => ({ id: String(c.id), name: c.name || '' })));
+      const subs = Array.isArray(subRes.data) ? subRes.data : [];
+      setSubCategories(
+        subs.map((s: { id?: string; name?: string; category_id?: string }) => ({
+          id: String(s.id),
+          name: s.name || '',
+          category_id: String(s.category_id || ''),
+        }))
+      );
+    } catch {
+      toast.error('Failed to load categories');
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchTaxonomy();
   }, []);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,8 +219,33 @@ export default function ProductsPage() {
       toast.success(`${selectedIds.size} product(s) deleted`);
       setSelectedIds(new Set());
       fetchProducts();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to delete');
+    } catch (err: unknown) {
+      toast.error(formatApiError(err, 'Failed to delete'));
+    }
+  };
+
+  const handleBulkAssignCategory = async () => {
+    if (selectedIds.size === 0 || !bulkCategoryId) {
+      toast.error('Select products and choose a category');
+      return;
+    }
+    setBulkAssigning(true);
+    try {
+      const payload: { ids: string[]; category_id: string; sub_category_id?: string } = {
+        ids: Array.from(selectedIds),
+        category_id: bulkCategoryId,
+      };
+      if (bulkSubId) payload.sub_category_id = bulkSubId;
+      const { data } = await adminApi.post<{ modified: number }>('/products/bulk-assign-category', payload);
+      toast.success(`Assigned category to ${data.modified} product(s)`);
+      setSelectedIds(new Set());
+      setBulkCategoryId('');
+      setBulkSubId('');
+      await fetchProducts();
+    } catch (err: unknown) {
+      toast.error(formatApiError(err, 'Failed to assign category'));
+    } finally {
+      setBulkAssigning(false);
     }
   };
 
@@ -218,9 +283,23 @@ export default function ProductsPage() {
   const lowStockCount = products.filter((p) => (p.stock_quantity ?? 0) > 0 && (p.stock_quantity ?? 0) <= lowStockThreshold(p)).length;
   const outOfStockCount = products.filter((p) => (p.stock_quantity ?? 0) <= 0).length;
 
-  const filteredBySearch = products.filter((p) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const searchLower = searchTerm.trim().toLowerCase();
+  const filteredBySearch = !searchLower
+    ? products
+    : products.filter((p) => {
+        const name = (p.name || '').toLowerCase();
+        const sku = (p.sku || '').toLowerCase();
+        const barcode = (p.barcode || '').toLowerCase();
+        const desc = (p.description || '').toLowerCase();
+        const cat = (p.category_name || '').toLowerCase();
+        return (
+          name.includes(searchLower) ||
+          sku.includes(searchLower) ||
+          barcode.includes(searchLower) ||
+          desc.includes(searchLower) ||
+          cat.includes(searchLower)
+        );
+      });
   const filteredProducts =
     stockFilter === 'low_stock'
       ? filteredBySearch.filter((p) => (p.stock_quantity ?? 0) > 0 && (p.stock_quantity ?? 0) <= lowStockThreshold(p))
@@ -445,38 +524,85 @@ export default function ProductsPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder="Search name, SKU, barcode, category, description…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
           />
         </div>
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-gray-600 font-medium">{selectedIds.size} selected</span>
-            <button
-              type="button"
-              onClick={handleExportSelected}
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 flex items-center gap-2"
-            >
-              <FileDown className="w-4 h-4" />
-              Export to Excel
-            </button>
-            <button
-              type="button"
-              onClick={handleBulkDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 flex items-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete selected
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-            >
-              Clear selection
-            </button>
+          <div className="flex flex-col gap-3 w-full lg:flex-row lg:flex-wrap lg:items-end">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-600 font-medium">{selectedIds.size} selected</span>
+              <span className="text-xs text-gray-500 hidden sm:inline">Tip: use the header checkbox to select all rows in the current list.</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-[#0f766e]/25 bg-teal-50/60 w-full lg:w-auto lg:max-w-3xl">
+              <Layers className="w-5 h-5 text-[#0f766e] shrink-0 hidden sm:block" />
+              <span className="text-sm font-medium text-gray-800 shrink-0">Bulk assign</span>
+              <select
+                value={bulkCategoryId}
+                onChange={(e) => {
+                  setBulkCategoryId(e.target.value);
+                  setBulkSubId('');
+                }}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white min-w-[160px] max-w-[220px]"
+              >
+                <option value="">Category…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={bulkSubId}
+                disabled={!bulkCategoryId}
+                onChange={(e) => setBulkSubId(e.target.value)}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white min-w-[160px] max-w-[220px] disabled:opacity-50"
+              >
+                <option value="">No subcategory</option>
+                {subCategories
+                  .filter((s) => s.category_id === bulkCategoryId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                disabled={!bulkCategoryId || bulkAssigning}
+                onClick={handleBulkAssignCategory}
+                className="text-sm bg-[#0f766e] text-white px-4 py-2 rounded-lg font-semibold hover:bg-[#0d5d57] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {bulkAssigning ? 'Applying…' : `Apply to ${selectedIds.size}`}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleExportSelected}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 flex items-center gap-2"
+              >
+                <FileDown className="w-4 h-4" />
+                Export
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium"
+              >
+                Clear selection
+              </button>
+            </div>
           </div>
         )}
       </div>
