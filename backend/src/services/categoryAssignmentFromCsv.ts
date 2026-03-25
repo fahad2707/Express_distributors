@@ -5,7 +5,7 @@ import Category from '../models/Category';
 const TWO_TOKEN_HINTS: Record<string, string[]> = {
   'general-general': ['general'],
   'general-merchandise': ['general'],
-  'winter-items': ['winter'],
+  'winter-items': ['winter-items', 'winter', 'winteritems'],
   'e-cigarettes': ['e-cigarettes', 'ecigarettes', 'e-cigarette'],
   'candy-snacks': ['candy-snacks', 'candy', 'snacks'],
   'health-beauty': ['health-beauty', 'health', 'beauty'],
@@ -63,7 +63,7 @@ export function hintsForCategorySlug(catSlug: string): string[] {
   if (first === 'candy') return ['candy-snacks'];
   if (first === 'health') return ['health-beauty'];
   if (first === 'nicotine') return ['nicotine-pouches'];
-  if (first === 'winter') return ['winter'];
+  if (first === 'winter') return ['winter-items', 'winter', 'winteritems'];
   return ['general'];
 }
 
@@ -89,16 +89,37 @@ export function normSkuBar(raw: string | undefined): string {
 }
 
 export function resolveCategoryId(hints: string[], cats: LeanCat[]): mongoose.Types.ObjectId | null {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
-  for (const h of hints) {
-    const hn = norm(h);
-    if (!hn) continue;
-    let c = cats.find((x) => norm(x.slug) === hn);
-    if (c) return c._id;
-    c = cats.find((x) => norm(x.slug).startsWith(hn) || hn.startsWith(norm(x.slug)));
-    if (c) return c._id;
-    c = cats.find((x) => norm(x.name).includes(hn) || hn.includes(norm(x.name)));
-    if (c) return c._id;
+  const norm = (s: string) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const sortedHints = [...hints].map(norm).filter((hn) => hn.length >= 2).sort((a, b) => b.length - a.length);
+
+  for (const hn of sortedHints) {
+    const exact = cats.find((x) => {
+      const sn = norm(x.slug);
+      return sn.length > 0 && sn === hn;
+    });
+    if (exact) return exact._id;
+
+    const slugPrefix = cats.find((x) => {
+      const sn = norm(x.slug);
+      if (!sn) return false;
+      return sn.startsWith(hn) || hn.startsWith(sn);
+    });
+    if (slugPrefix) return slugPrefix._id;
+
+    const nameHas = cats.find((x) => {
+      const nn = norm(x.name);
+      if (!nn) return false;
+      return nn.includes(hn);
+    });
+    if (nameHas) return nameHas._id;
+
+    if (hn.length >= 4) {
+      const slugHas = cats.find((x) => {
+        const sn = norm(x.slug);
+        return sn.length > 0 && sn.includes(hn);
+      });
+      if (slugHas) return slugHas._id;
+    }
   }
   return null;
 }
@@ -111,6 +132,24 @@ type ProductLean = {
   name?: string;
   category_id?: mongoose.Types.ObjectId;
 };
+
+/** Keys to match product name (full row title vs last segment after ":"). */
+function nameLookupKeys(raw: string | undefined): string[] {
+  const t = String(raw ?? '').trim().toLowerCase();
+  const keys = new Set<string>();
+  if (t) {
+    keys.add(t);
+    keys.add(t.replace(/\s+/g, ' '));
+  }
+  if (t.includes(':')) {
+    const tail = t.split(':').pop()?.trim();
+    if (tail) {
+      keys.add(tail);
+      keys.add(tail.replace(/\s+/g, ' '));
+    }
+  }
+  return [...keys].filter(Boolean);
+}
 
 export async function assignCategoriesFromCsvRows(rows: CsvAssignRow[], dryRun: boolean) {
   const cats = (await Category.find({}).select('_id name slug').lean()) as LeanCat[];
@@ -129,7 +168,11 @@ export async function assignCategoriesFromCsvRows(rows: CsvAssignRow[], dryRun: 
     if (sku) bySku.set(sku, p);
     const bc = normSkuBar(p.barcode as string);
     if (bc) byBarcode.set(bc, p);
-    if (p.name) byName.set(String(p.name).trim().toLowerCase(), p);
+    if (p.name) {
+      for (const k of nameLookupKeys(p.name)) {
+        byName.set(k, p);
+      }
+    }
   }
 
   let updated = 0;
@@ -150,14 +193,21 @@ export async function assignCategoriesFromCsvRows(rows: CsvAssignRow[], dryRun: 
     const slugKey = (row.slug || '').trim().toLowerCase();
     const skuKey = normSkuBar(row.sku);
     const bcKey = normSkuBar(row.barcode);
-    const nameKey = (row.name || '').trim().toLowerCase();
 
-    const prod =
+    let prod: ProductLean | null =
       (slugKey && bySlug.get(slugKey)) ||
       (skuKey && bySku.get(skuKey)) ||
       (bcKey && byBarcode.get(bcKey)) ||
-      (nameKey && byName.get(nameKey)) ||
       null;
+    if (!prod) {
+      for (const nk of nameLookupKeys(row.name)) {
+        const p = byName.get(nk);
+        if (p) {
+          prod = p;
+          break;
+        }
+      }
+    }
 
     if (!prod) {
       skippedNoProduct++;
