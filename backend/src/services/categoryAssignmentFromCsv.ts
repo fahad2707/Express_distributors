@@ -208,6 +208,9 @@ export async function assignCategoriesFromCsvRows(rows: CsvAssignRow[], dryRun: 
   let skippedNoCategory = 0;
   let unchanged = 0;
   const unresolvedHints = new Set<string>();
+  const now = new Date();
+  // Avoid duplicate updates when the CSV has repeated rows for the same product.
+  const pending = new Map<string, { _id: mongoose.Types.ObjectId; categoryId: mongoose.Types.ObjectId }>();
 
   for (const row of rows) {
     const rowCatSlug = normalizeCsvCategorySlug(String(row.category_slug || '').trim());
@@ -250,13 +253,29 @@ export async function assignCategoriesFromCsvRows(rows: CsvAssignRow[], dryRun: 
       continue;
     }
 
-    if (!dryRun) {
-      await Product.updateOne(
-        { _id: prod._id },
-        { $set: { category_id: catId, updated_at: new Date() }, $unset: { sub_category_id: 1 } }
-      );
+    const key = String(prod._id);
+    const existing = pending.get(key);
+    if (!existing) {
+      pending.set(key, { _id: prod._id, categoryId: catId });
+      updated++;
+    } else if (String(existing.categoryId) !== String(catId)) {
+      // Should not happen for correct CSV, but if it does, keep last mapping.
+      pending.set(key, { _id: prod._id, categoryId: catId });
     }
-    updated++;
+  }
+
+  if (!dryRun && pending.size) {
+    const ops = Array.from(pending.values()).map(({ _id, categoryId }) => ({
+      updateOne: {
+        filter: { _id },
+        update: {
+          $set: { category_id: categoryId, updated_at: now },
+          $unset: { sub_category_id: 1 },
+        },
+      },
+    }));
+
+    await Product.bulkWrite(ops, { ordered: false });
   }
 
   return {

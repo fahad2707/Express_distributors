@@ -200,7 +200,7 @@ export default function ProductsPage() {
       const fd = new FormData();
       fd.append('file', file);
       const q = assignCategoriesDryRun ? '?dry_run=1' : '';
-      const { data } = await adminApi.post<{
+      const { data } = await uploadApi.post<{
         csvRows: number;
         updated: number;
         unchanged: number;
