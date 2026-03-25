@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit, Trash2, Search, Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, FileDown, Layers } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, FileDown, Layers, Tags } from 'lucide-react';
 import adminApi, { uploadApi } from '@/lib/admin-api';
 import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
@@ -81,6 +81,9 @@ export default function ProductsPage() {
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [importResult, setImportResult] = useState<ImportExecuteResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const assignCategoriesFileRef = useRef<HTMLInputElement>(null);
+  const [assignCategoriesDryRun, setAssignCategoriesDryRun] = useState(true);
+  const [assignCategoriesBusy, setAssignCategoriesBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'out_of_stock'>('all');
@@ -183,6 +186,48 @@ export default function ProductsPage() {
     setSelectedFile(null);
     setPreview(null);
     setImportResult(null);
+  };
+
+  const handleAssignCategoriesCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file?.name.toLowerCase().endsWith('.csv')) {
+      toast.error('Please choose a CSV file');
+      return;
+    }
+    setAssignCategoriesBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const q = assignCategoriesDryRun ? '?dry_run=1' : '';
+      const { data } = await adminApi.post<{
+        csvRows: number;
+        updated: number;
+        unchanged: number;
+        skippedNoProduct: number;
+        skippedNoCategory: number;
+        unresolvedHints?: string[];
+        dryRun?: boolean;
+      }>(`/products/assign-categories-csv${q}`, fd);
+      const parts = [
+        assignCategoriesDryRun ? `Preview: would update ${data.updated}` : `Updated ${data.updated}`,
+        `unchanged ${data.unchanged}`,
+        `no match ${data.skippedNoProduct}`,
+        `no category ${data.skippedNoCategory}`,
+      ];
+      toast.success(parts.join(' · '), { duration: 6000 });
+      if (data.unresolvedHints?.length) {
+        toast(`Unresolved hints (rename categories or adjust CSV): ${data.unresolvedHints.slice(0, 8).join(', ')}`, {
+          icon: '⚠️',
+          duration: 8000,
+        });
+      }
+      if (!assignCategoriesDryRun && data.updated > 0) fetchProducts();
+    } catch (err: unknown) {
+      toast.error(formatApiError(err, 'Category assignment failed'));
+    } finally {
+      setAssignCategoriesBusy(false);
+    }
   };
 
   const handleDelete = async (id: string | number) => {
@@ -391,6 +436,43 @@ export default function ProductsPage() {
           <button type="button" onClick={() => setStockFilter('all')} className="ml-2 text-[#0f766e] font-medium hover:underline">Show all</button>
         </p>
       )}
+
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 mb-6">
+        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+          <Tags className="w-5 h-5 text-[#0f766e]" />
+          Assign categories from master CSV
+        </h3>
+        <p className="text-sm text-gray-600 mt-1 max-w-3xl">
+          Upload your <strong>final csv.csv</strong> (or same format: <strong>slug</strong>, <strong>category_slug</strong>, name, sku, barcode). Each row maps to a product;{' '}
+          <strong>category_slug</strong> is grouped into your top-level categories (General, Winter, E-Cigarettes, Candy &amp; Snacks, etc.). Matching: slug → SKU → barcode → name. Subcategories are cleared so only the main category applies.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <input
+            ref={assignCategoriesFileRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleAssignCategoriesCsv}
+          />
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={assignCategoriesDryRun}
+              onChange={(ev) => setAssignCategoriesDryRun(ev.target.checked)}
+              className="rounded border-gray-300 text-[#0f766e] focus:ring-[#0f766e]"
+            />
+            Preview only (dry run — no database changes)
+          </label>
+          <button
+            type="button"
+            disabled={assignCategoriesBusy}
+            onClick={() => assignCategoriesFileRef.current?.click()}
+            className="bg-[#0f766e]/10 text-[#0f766e] border border-[#0f766e]/30 px-5 py-2 rounded-lg font-semibold hover:bg-[#0f766e]/15 disabled:opacity-50"
+          >
+            {assignCategoriesBusy ? 'Processing…' : 'Choose CSV & assign'}
+          </button>
+        </div>
+      </div>
 
       {/* Import preview / progress / summary */}
       {importStep === 'preview' && preview && (

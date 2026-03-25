@@ -6,7 +6,9 @@ import Category from '../models/Category';
 import SubCategory from '../models/SubCategory';
 import { authenticateAdmin, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
+import { parse as parseCsv } from 'csv-parse/sync';
 import { buildPreview, executeImport } from '../services/productImportService';
+import { assignCategoriesFromCsvRows, type CsvAssignRow } from '../services/categoryAssignmentFromCsv';
 
 const router = express.Router();
 
@@ -464,6 +466,26 @@ router.post('/bulk-assign-category', authenticateAdmin, async (req: AuthRequest,
     if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
     console.error('Bulk assign category error:', error);
     res.status(500).json({ error: 'Failed to assign category' });
+  }
+});
+
+// Admin: Bulk-set categories from a CSV with columns matching final csv (name, slug, category_slug, sku, barcode, …)
+router.post('/assign-categories-csv', authenticateAdmin, upload.single('file'), async (req: AuthRequest, res) => {
+  if (!req.file?.buffer) {
+    return res.status(400).json({ error: 'No CSV uploaded. Use form field name: file' });
+  }
+  try {
+    const rows = parseCsv(req.file.buffer.toString('utf8'), {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    }) as CsvAssignRow[];
+    const dryRun = req.query.dry_run === '1' || req.query.dry_run === 'true';
+    const result = await assignCategoriesFromCsvRows(rows, dryRun);
+    res.json({ ...result, dryRun });
+  } catch (error: any) {
+    console.error('assign-categories-csv:', error);
+    res.status(500).json({ error: error.message || 'Failed to process CSV' });
   }
 });
 
