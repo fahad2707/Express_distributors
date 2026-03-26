@@ -220,7 +220,7 @@ function OrderConfirmationContent() {
         <div className="text-center">
           <button
             type="button"
-            onClick={() => router.push('/store')}
+            onClick={() => router.push('/')}
             className="text-[#0f766e] font-medium hover:underline"
           >
             Continue shopping

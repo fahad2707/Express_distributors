@@ -119,18 +119,20 @@ export default function CartPage() {
                   {item.image_url ? (
                     <img
                       src={item.image_url}
-                      alt={item.name}
+                      alt={item.name.replace(/&/g, 'and')}
                       className="w-24 h-24 sm:w-32 sm:h-32 object-cover rounded-xl"
                     />
                   ) : (
                     <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-[#7c5cff] to-[#4f8cff] rounded-xl flex items-center justify-center">
                       <span className="text-3xl text-white font-bold">
-                        {item.name.charAt(0)}
+                        {item.name.replace(/&/g, 'and').charAt(0)}
                       </span>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-lg text-slate-50 mb-1 truncate">{item.name}</h3>
+                    <h3 className="font-semibold text-lg text-slate-50 mb-1 truncate">
+                      {item.name.replace(/&/g, 'and')}
+                    </h3>
                     <p className="text-[#c7d2ff] font-bold text-lg mb-3">
                       ${item.price.toFixed(2)}
                     </p>

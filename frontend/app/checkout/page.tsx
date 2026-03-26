@@ -55,7 +55,16 @@ export default function CheckoutPage() {
       const raw = localStorage.getItem('checkout_cart');
       if (raw) {
         const items = JSON.parse(raw) as CartItem[];
-        if (items.length) { setCart(items); return; }
+        if (items.length) {
+          // Replace '&' with 'and' to avoid weird font rendering.
+          setCart(
+            items.map((it) => ({
+              ...it,
+              name: String(it.name ?? '').replace(/&/g, 'and'),
+            }))
+          );
+          return;
+        }
       }
     } catch {}
     router.push('/');
@@ -316,6 +325,15 @@ export default function CheckoutPage() {
                       />
                     </div>
                   </div>
+                  <p
+                    style={{
+                      color: theme.fog,
+                      fontSize: '0.82rem',
+                      marginTop: '0.25rem',
+                    }}
+                  >
+                    Note: We are currently accepting COD.
+                  </p>
                 </div>
               )}
 
