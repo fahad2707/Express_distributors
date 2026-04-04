@@ -4,13 +4,27 @@ import mongoose from 'mongoose';
 import Product from '../models/Product';
 import Category from '../models/Category';
 import SubCategory from '../models/SubCategory';
-import { authenticateAdmin, AuthRequest } from '../middleware/auth';
+import { authenticateAdmin, optionalAuthenticateAdmin, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { buildPreview, executeImport } from '../services/productImportService';
 import { assignCategoriesFromCsvRows, type CsvAssignRow } from '../services/categoryAssignmentFromCsv';
 
 const router = express.Router();
+
+/** Treat legacy / bad data: only explicit false-like values hide from storefront. */
+function isExplicitlyInactive(is_active: unknown): boolean {
+  return is_active === false || is_active === 'false' || is_active === 0;
+}
+
+function normalizeVisibilityQuery(visibility: unknown): string {
+  const raw = Array.isArray(visibility) ? visibility[0] : visibility;
+  return typeof raw === 'string' ? raw : '';
+}
+
+const CATALOG_VISIBLE_MATCH = {
+  $nor: [{ is_active: false }, { is_active: 'false' }, { is_active: 0 }],
+};
 
 /** Only return an ObjectId if the string is a valid 24-char hex; otherwise undefined (avoids Mongoose throw). */
 function toObjectIdOrUndefined(id: string | undefined): mongoose.Types.ObjectId | undefined {
@@ -54,16 +68,33 @@ const upload = multer({
   },
 });
 
-// Get all products (public)
-router.get('/', async (req, res) => {
+// Get all products (public, or admin with visibility=active|inactive|all)
+router.get('/', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
   try {
-    const { category, category_id: categoryIdParam, sub_category_id: subCategoryIdParam, search, page = 1, limit } = req.query;
+    const { category, category_id: categoryIdParam, sub_category_id: subCategoryIdParam, search, page = 1, limit, visibility } = req.query;
     const limitNum = Math.min(Math.max(Number(limit) || 100, 1), 5000);
     const pageNum = Math.max(Number(page) || 1, 1);
     const skip = (pageNum - 1) * limitNum;
 
-    // Storefront: show unless explicitly deactivated (missing is_active counts as visible — legacy docs)
-    const andParts: any[] = [{ is_active: { $ne: false } }];
+    const isAdmin = req.userRole === 'admin';
+    const vis = normalizeVisibilityQuery(visibility);
+
+    if ((vis === 'inactive' || vis === 'all') && !isAdmin) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const andParts: any[] = [];
+    if (!isAdmin) {
+      // Storefront / guests: exclude explicitly inactive (boolean false, string "false", or 0)
+      andParts.push({ $nor: [{ is_active: false }, { is_active: 'false' }, { is_active: 0 }] });
+    } else if (vis === 'inactive') {
+      andParts.push({ $or: [{ is_active: false }, { is_active: 'false' }, { is_active: 0 }] });
+    } else if (vis === 'all') {
+      // no is_active filter
+    } else {
+      // admin visibility=active or omitted: same as storefront
+      andParts.push({ $nor: [{ is_active: false }, { is_active: 'false' }, { is_active: 0 }] });
+    }
 
     // Filter by category slug (store) or category_id / sub_category_id (admin catalog)
     if (categoryIdParam && typeof categoryIdParam === 'string') {
@@ -102,7 +133,12 @@ router.get('/', async (req, res) => {
       });
     }
 
-    const query = andParts.length === 1 ? andParts[0] : { $and: andParts };
+    const query =
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? andParts[0]
+          : { $and: andParts };
 
     const products = await Product.find(query)
       .populate('category_id', 'name slug')
@@ -139,7 +175,7 @@ router.get('/', async (req, res) => {
         available_quantity: onHand - committed,
         low_stock_threshold: product.low_stock_threshold,
         tax_rate: product.tax_rate != null ? Number(product.tax_rate) : 0,
-        is_active: product.is_active,
+        is_active: !isExplicitlyInactive(product.is_active),
         created_at: product.created_at,
       };
     });
@@ -163,9 +199,17 @@ router.get('/', async (req, res) => {
 router.get('/barcode/:barcode', authenticateAdmin, async (req, res) => {
   try {
     const code = req.params.barcode?.trim() || '';
-    let product = await Product.findOne({ barcode: code, is_active: true }).populate('category_id', 'name slug').lean();
+    let product = await Product.findOne({
+      $and: [{ barcode: code }, CATALOG_VISIBLE_MATCH],
+    })
+      .populate('category_id', 'name slug')
+      .lean();
     if (!product) {
-      product = await Product.findOne({ sku: code, is_active: true }).populate('category_id', 'name slug').lean();
+      product = await Product.findOne({
+        $and: [{ sku: code }, CATALOG_VISIBLE_MATCH],
+      })
+        .populate('category_id', 'name slug')
+        .lean();
     }
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -187,7 +231,7 @@ router.get('/barcode/:barcode', authenticateAdmin, async (req, res) => {
 });
 
 // Get product by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate('category_id', 'name slug')
@@ -198,6 +242,9 @@ router.get('/:id', async (req, res) => {
     }
 
     const p = product as any;
+    if (isExplicitlyInactive(p.is_active) && req.userRole !== 'admin') {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     const stockQty = p.stock_quantity ?? 0;
     const committed = p.committed_quantity ?? 0;
     res.json({
@@ -262,6 +309,7 @@ router.post('/', authenticateAdmin, async (req: AuthRequest, res) => {
       cost_price: z.coerce.number().min(0).optional(),
       stock_quantity: z.coerce.number().int().min(0).optional(),
       low_stock_threshold: z.coerce.number().int().min(0).optional(),
+      is_active: z.boolean().optional(),
     });
 
     const raw = schema.parse(req.body);
@@ -296,7 +344,7 @@ router.post('/', authenticateAdmin, async (req: AuthRequest, res) => {
       barcode: data.barcode || undefined,
       stock_quantity: data.stock_quantity ?? 0,
       low_stock_threshold: data.low_stock_threshold ?? 10,
-      is_active: true,
+      is_active: data.is_active !== false,
     });
 
     const obj = product.toObject();
@@ -415,6 +463,22 @@ router.post('/bulk-delete', authenticateAdmin, async (req: AuthRequest, res) => 
     if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
     console.error('Bulk delete products error:', error);
     res.status(500).json({ error: 'Failed to delete products' });
+  }
+});
+
+// Admin: Bulk set products active (show on website again)
+router.post('/bulk-activate', authenticateAdmin, async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({ ids: z.array(z.string()).min(1) });
+    const { ids } = schema.parse(req.body);
+    const validIds = ids.filter((id) => /^[a-f0-9A-F]{24}$/.test(id));
+    if (validIds.length === 0) return res.status(400).json({ error: 'No valid product IDs' });
+    const result = await Product.updateMany({ _id: { $in: validIds } }, { is_active: true, updated_at: new Date() });
+    res.json({ message: `${result.modifiedCount} product(s) activated`, modified: result.modifiedCount });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
+    console.error('Bulk activate products error:', error);
+    res.status(500).json({ error: 'Failed to activate products' });
   }
 });
 

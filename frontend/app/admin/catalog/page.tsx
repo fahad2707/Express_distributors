@@ -51,6 +51,7 @@ interface Product {
   price?: number;
   category_id?: string;
   sub_category_id?: string;
+  is_active?: boolean;
 }
 
 const TABS: { id: TabId; label: string; icon: typeof FolderTree }[] = [
@@ -184,7 +185,7 @@ export default function CatalogPage() {
   const fetchProductsByCategory = useCallback(async (categoryId: string) => {
     setProductsLoading(true);
     try {
-      const res = await adminApi.get('/products', { params: { category_id: categoryId, limit: 500 } });
+      const res = await adminApi.get('/products', { params: { category_id: categoryId, limit: 500, visibility: 'all' } });
       setProductsInCategory(res.data?.products || []);
     } catch {
       setProductsInCategory([]);
@@ -196,7 +197,7 @@ export default function CatalogPage() {
   const fetchProductsBySubcategory = useCallback(async (subcategoryId: string) => {
     setProductsLoading(true);
     try {
-      const res = await adminApi.get('/products', { params: { sub_category_id: subcategoryId, limit: 500 } });
+      const res = await adminApi.get('/products', { params: { sub_category_id: subcategoryId, limit: 500, visibility: 'all' } });
       setProductsInSubcategory(res.data?.products || []);
     } catch {
       setProductsInSubcategory([]);
@@ -207,7 +208,7 @@ export default function CatalogPage() {
 
   const fetchAllProducts = useCallback(async () => {
     try {
-      const res = await adminApi.get('/products', { params: { limit: 2000 } });
+      const res = await adminApi.get('/products', { params: { limit: 2000, visibility: 'all' } });
       setAllProducts(res.data?.products || []);
     } catch {
       setAllProducts([]);
@@ -896,7 +897,14 @@ export default function CatalogPage() {
                     <tbody>
                       {productsInCategory.map((p) => (
                         <tr key={p.id} className="border-b border-gray-100">
-                          <td className="py-2 px-4 font-medium">{p.name}</td>
+                          <td className="py-2 px-4 font-medium">
+                            <span className="inline-flex flex-wrap items-center gap-2">
+                              {p.name}
+                              {p.is_active === false && (
+                                <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Inactive</span>
+                              )}
+                            </span>
+                          </td>
                           <td className="py-2 px-4 text-gray-600">{p.sku || '—'}</td>
                           <td className="py-2 px-4 text-right">{p.price != null ? Number(p.price).toLocaleString() : '—'}</td>
                           <td className="py-2 px-4 text-right">
@@ -947,7 +955,14 @@ export default function CatalogPage() {
                     <tbody>
                       {productsInSubcategory.map((p) => (
                         <tr key={p.id} className="border-b border-gray-100">
-                          <td className="py-2 px-4 font-medium">{p.name}</td>
+                          <td className="py-2 px-4 font-medium">
+                            <span className="inline-flex flex-wrap items-center gap-2">
+                              {p.name}
+                              {p.is_active === false && (
+                                <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Inactive</span>
+                              )}
+                            </span>
+                          </td>
                           <td className="py-2 px-4 text-gray-600">{p.sku || '—'}</td>
                           <td className="py-2 px-4 text-right">{p.price != null ? Number(p.price).toLocaleString() : '—'}</td>
                           <td className="py-2 px-4 text-right">

@@ -11,6 +11,9 @@
     "seed": "tsx src/db/seed.ts",
     "clear-admin-data": "tsx src/db/clear-admin-data.ts",
     "db:reset": "tsx src/db/clear-all-data.ts",
+    "db:clear-products-categories": "tsx src/db/clear-products-categories.ts",
+    "db:import-category-xls": "tsx src/db/import-batch-xls.ts",
+    "db:import-all-category-xls": "tsx src/db/import-all-category-xls.ts",
     "assign-categories-csv": "tsx src/db/assignCategoriesFromFinalCsv.ts"
   },
   "dependencies": {

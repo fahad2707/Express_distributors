@@ -8,10 +8,8 @@ import fs from 'fs';
 import path from 'path';
 import { parse } from 'csv-parse/sync';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import connectDB from './connection';
 import { assignCategoriesFromCsvRows, type CsvAssignRow } from '../services/categoryAssignmentFromCsv';
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const repoRoot = path.resolve(__dirname, '../../..');
 const defaultCsv = path.join(repoRoot, 'final csv.csv');
@@ -25,13 +23,12 @@ async function main() {
     process.exit(1);
   }
 
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    console.error('Set MONGODB_URI');
+  if (!process.env.MONGODB_URI?.trim()) {
+    console.error('Set MONGODB_URI in backend/.env (and MONGODB_DB_NAME if your data is not in the URI path).');
     process.exit(1);
   }
 
-  await mongoose.connect(uri);
+  await connectDB();
   const text = fs.readFileSync(csvPath, 'utf8');
   const rows = parse(text, { columns: true, skip_empty_lines: true, trim: true }) as CsvAssignRow[];
 

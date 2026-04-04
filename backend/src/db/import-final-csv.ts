@@ -1,21 +1,16 @@
 import mongoose from 'mongoose';
 import fs from 'fs';
 import { parse } from 'csv-parse';
-import dotenv from 'dotenv';
 import path from 'path';
+import connectDB from './connection';
 import Product from '../models/Product';
 import Category from '../models/Category';
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const CSV_FILE_PATH = '/Users/tahminachoudhury/Desktop/asif/final csv.csv';
 
 const runImport = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/express_distributors';
-    console.log(`Connecting to MongoDB at ${mongoUri}`);
-    await mongoose.connect(mongoUri);
-    console.log('Connected to MongoDB');
+    await connectDB();
 
     // Wipe existing products and categories since this is a clean re-import
     console.log('Clearing existing products and categories...');

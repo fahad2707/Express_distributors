@@ -3,8 +3,11 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 
 import connectDB from './db/connection';
+import Product from './models/Product';
+import Category from './models/Category';
 import { apiGeneralLimiter } from './middleware/rateLimit';
 import { logSecurityEvent } from './utils/securityLog';
 import Admin from './models/Admin';
@@ -118,9 +121,34 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api', apiGeneralLimiter);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check (add ?detail=1 for DB name + catalog counts — use to verify Railway → correct Atlas database)
+app.get('/health', async (req, res) => {
+  const st = mongoose.connection.readyState;
+  const mongo: {
+    connected: boolean;
+    name?: string;
+    readyState: number;
+    productCount?: number;
+    categoryCount?: number;
+  } = {
+    connected: st === 1,
+    name: st === 1 ? mongoose.connection.name : undefined,
+    readyState: st,
+  };
+  if (req.query.detail === '1' && st === 1) {
+    try {
+      const [productCount, categoryCount] = await Promise.all([
+        Product.countDocuments(),
+        Category.countDocuments(),
+      ]);
+      mongo.productCount = productCount;
+      mongo.categoryCount = categoryCount;
+    } catch {
+      mongo.productCount = undefined;
+      mongo.categoryCount = undefined;
+    }
+  }
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), mongo });
 });
 
 // Serve uploaded files (customer documents, etc.)
@@ -179,6 +207,12 @@ async function start() {
   await ensureDefaultAdmin();
   server = app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    const dbn = mongoose.connection.name;
+    const override = process.env.MONGODB_DB_NAME?.trim();
+    console.log(
+      `[catalog] MongoDB database="${dbn}"` +
+        (override ? ` (MONGODB_DB_NAME=${override})` : ' (from MONGODB_URI path)')
+    );
   });
 }
 
