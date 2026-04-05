@@ -15,6 +15,10 @@ import {
   Layers,
   Tags,
   RotateCcw,
+  Image,
+  ImageOff,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import adminApi, { uploadApi } from '@/lib/admin-api';
 import { formatApiError } from '@/lib/format-api-error';
@@ -109,6 +113,9 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
   const [bulkSubId, setBulkSubId] = useState('');
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [imageFilter, setImageFilter] = useState<'all' | 'no_image' | 'has_image'>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -150,6 +157,10 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
     fetchProducts();
     fetchTaxonomy();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, stockFilter, imageFilter, mode]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -382,7 +393,7 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
           cat.includes(searchLower)
         );
       });
-  const filteredProducts =
+  const stockFiltered =
     mode === 'inactive'
       ? filteredBySearch
       : stockFilter === 'low_stock'
@@ -390,6 +401,21 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
         : stockFilter === 'out_of_stock'
           ? filteredBySearch.filter((p) => (p.stock_quantity ?? 0) <= 0)
           : filteredBySearch;
+
+  const hasProductImage = (p: Product) => !!(p.image_url && String(p.image_url).trim());
+
+  const filteredProducts =
+    imageFilter === 'no_image'
+      ? stockFiltered.filter((p) => !hasProductImage(p))
+      : imageFilter === 'has_image'
+        ? stockFiltered.filter((p) => hasProductImage(p))
+        : stockFiltered;
+
+  const noImageCount = stockFiltered.filter((p) => !hasProductImage(p)).length;
+  const totalFiltered = filteredProducts.length;
+  const pageCount = Math.max(1, Math.ceil(totalFiltered / pageSize) || 1);
+  const safePage = Math.min(Math.max(1, page), pageCount);
+  const pagedProducts = filteredProducts.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div>
@@ -447,6 +473,93 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6 space-y-3">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search name, SKU, barcode, category, description…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-600 font-medium shrink-0">Pictures:</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setImageFilter('all')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                imageFilter === 'all'
+                  ? 'bg-[#0f766e] text-white border-[#0f766e]'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setImageFilter(imageFilter === 'no_image' ? 'all' : 'no_image')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                imageFilter === 'no_image'
+                  ? 'bg-amber-600 text-white border-amber-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <ImageOff className="w-4 h-4" />
+              Missing image
+              <span className="tabular-nums opacity-90">({noImageCount.toLocaleString()})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setImageFilter(imageFilter === 'has_image' ? 'all' : 'has_image')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                imageFilter === 'has_image'
+                  ? 'bg-[#0f766e] text-white border-[#0f766e]'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Image className="w-4 h-4" />
+              Has image
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-gray-100">
+          <p className="text-sm text-gray-600">
+            {totalFiltered === 0 ? (
+              <>No products match.</>
+            ) : (
+              <>
+                Showing{' '}
+                <span className="font-medium text-gray-900 tabular-nums">
+                  {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, totalFiltered)}
+                </span>{' '}
+                of <span className="font-medium text-gray-900 tabular-nums">{totalFiltered.toLocaleString()}</span>
+                {searchTerm.trim() || imageFilter !== 'all' || (mode === 'active' && stockFilter !== 'all') ? (
+                  <span className="text-gray-500"> (filtered)</span>
+                ) : null}
+              </>
+            )}
+          </p>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <span className="shrink-0">Rows per page</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 bg-white font-medium"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {/* Low stock / Out of stock indicators - click to filter */}
@@ -659,18 +772,8 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
       </>
       )}
 
+      {selectedIds.size > 0 && (
       <div className="bg-white rounded-xl shadow-md p-6 mb-6 flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search name, SKU, barcode, category, description…"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-          />
-        </div>
-        {selectedIds.size > 0 && (
           <div className="flex flex-col gap-3 w-full lg:flex-row lg:flex-wrap lg:items-end">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-gray-600 font-medium">{selectedIds.size} selected</span>
@@ -757,17 +860,17 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
               </button>
             </div>
           </div>
-        )}
       </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white rounded-xl shadow-md">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="w-12 py-3 px-4 text-center text-gray-700">#</th>
                 <th className="w-12 py-3 px-4">
@@ -787,9 +890,9 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product, index) => (
+              {pagedProducts.map((product, index) => (
                 <tr key={String(product.id)} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 text-center text-gray-600 font-medium">{index + 1}</td>
+                  <td className="py-3 px-4 text-center text-gray-600 font-medium">{(safePage - 1) * pageSize + index + 1}</td>
                   <td className="py-3 px-4">
                     <input
                       type="checkbox"
@@ -848,6 +951,34 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
               ))}
             </tbody>
           </table>
+          {totalFiltered > 0 && pageCount > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-gray-50/80">
+              <p className="text-sm text-gray-600">
+                Page <span className="font-semibold text-gray-900 tabular-nums">{safePage}</span> of{' '}
+                <span className="font-semibold text-gray-900 tabular-nums">{pageCount}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= pageCount}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
