@@ -80,9 +80,11 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     });
   } catch (err) {
     console.error('API proxy error:', (err as Error).message, target);
-    return NextResponse.json(
-      { error: 'Backend unreachable. Set BACKEND_URL or NEXT_PUBLIC_API_URL.' },
-      { status: 502 }
-    );
+    const isProd = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    const hasBackend = !!process.env.BACKEND_URL?.trim() || !!process.env.NEXT_PUBLIC_API_URL?.trim();
+    const msg = isProd && !hasBackend
+      ? 'Server misconfiguration: set BACKEND_URL (Render API origin, no /api) on Vercel, or set NEXT_PUBLIC_API_URL to https://<your-api>.onrender.com/api and redeploy. See inject-site-api.cjs in the repo.'
+      : 'Backend unreachable. Set BACKEND_URL (or NEXT_PUBLIC_API_URL) on Vercel to your Render service URL.';
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
