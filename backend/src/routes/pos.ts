@@ -15,6 +15,10 @@ const generateSaleNumber = () => {
   return `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 };
 
+const POS_CATALOG_ACTIVE = {
+  $nor: [{ is_active: false }, { is_active: 'false' }, { is_active: 0 }],
+} as const;
+
 // Search product by barcode, PLU, SKU, or name
 router.get('/products/search', authenticateAdmin, async (req: AuthRequest, res) => {
   try {
@@ -24,22 +28,30 @@ router.get('/products/search', authenticateAdmin, async (req: AuthRequest, res) 
       return res.json({ products: [] });
     }
 
-    let query: any = { is_active: true };
+    const code = String(q).trim();
+    let query: any;
 
     if (type === 'barcode') {
-      query.barcode = q;
+      // Scanners often send the value stored on SKU/PLU; check all exact-match fields
+      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ barcode: code }, { sku: code }, { plu: code }] }] };
     } else if (type === 'plu') {
-      query.plu = q;
+      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ plu: code }, { sku: code }, { barcode: code }] }] };
     } else if (type === 'sku') {
-      query.sku = q;
+      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ sku: code }, { barcode: code }, { plu: code }] }] };
     } else {
-      // Search by name
-      query.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { barcode: { $regex: q, $options: 'i' } },
-        { plu: { $regex: q, $options: 'i' } },
-        { sku: { $regex: q, $options: 'i' } },
-      ];
+      query = {
+        $and: [
+          POS_CATALOG_ACTIVE,
+          {
+            $or: [
+              { name: { $regex: q, $options: 'i' } },
+              { barcode: { $regex: q, $options: 'i' } },
+              { plu: { $regex: q, $options: 'i' } },
+              { sku: { $regex: q, $options: 'i' } },
+            ],
+          },
+        ],
+      };
     }
 
     const products = await Product.find(query).limit(20).lean();

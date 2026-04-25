@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { buildPreview, executeImport } from '../services/productImportService';
 import { assignCategoriesFromCsvRows, type CsvAssignRow } from '../services/categoryAssignmentFromCsv';
+import { generateItemId, backfillProductSkuAndBarcode } from '../utils/productCodes';
 
 const router = express.Router();
 
@@ -42,19 +43,28 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-async function generateItemId(): Promise<string> {
-  const ProductModel = Product;
-  for (let i = 0; i < 20; i++) {
-    const id = String(Math.floor(100000 + Math.random() * 900000));
-    const exists = await ProductModel.findOne({ sku: id });
-    if (!exists) return id;
-  }
-  return String(Date.now() % 1000000).padStart(6, '0');
-}
-
 router.get('/generate-id', authenticateAdmin, async (req, res) => {
   const item_id = await generateItemId();
   res.json({ item_id });
+});
+
+/** One-time / maintenance: set missing SKUs and duplicate SKU into empty barcode for scanning. */
+router.post('/backfill-codes', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await backfillProductSkuAndBarcode();
+    res.json({
+      message: 'Backfill complete',
+      updated: result.updated,
+      examined: result.examined,
+      skippedNoChange: result.skippedNoChange,
+      warnings: result.warnings.slice(0, 100),
+      warningCount: result.warnings.length,
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Backfill failed';
+    console.error('Backfill codes error:', e);
+    res.status(500).json({ error: msg });
+  }
 });
 
 // Multer for CSV upload (memory)
@@ -129,6 +139,7 @@ router.get('/', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
           { description: { $regex: searchStr, $options: 'i' } },
           { sku: searchStr },
           { barcode: searchStr },
+          { plu: searchStr },
         ],
       });
     }
@@ -170,6 +181,7 @@ router.get('/', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
         sub_category_name: product.sub_category_id?.name,
         image_url: product.image_url,
         barcode: product.barcode,
+        plu: product.plu,
         stock_quantity: onHand,
         committed_quantity: committed,
         available_quantity: onHand - committed,
@@ -207,6 +219,13 @@ router.get('/barcode/:barcode', authenticateAdmin, async (req, res) => {
     if (!product) {
       product = await Product.findOne({
         $and: [{ sku: code }, CATALOG_VISIBLE_MATCH],
+      })
+        .populate('category_id', 'name slug')
+        .lean();
+    }
+    if (!product) {
+      product = await Product.findOne({
+        $and: [{ plu: code }, CATALOG_VISIBLE_MATCH],
       })
         .populate('category_id', 'name slug')
         .lean();

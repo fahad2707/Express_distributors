@@ -14,7 +14,8 @@
     "db:clear-products-categories": "tsx src/db/clear-products-categories.ts",
     "db:import-category-xls": "tsx src/db/import-batch-xls.ts",
     "db:import-all-category-xls": "tsx src/db/import-all-category-xls.ts",
-    "assign-categories-csv": "tsx src/db/assignCategoriesFromFinalCsv.ts"
+    "assign-categories-csv": "tsx src/db/assignCategoriesFromFinalCsv.ts",
+    "db:backfill-product-codes": "tsx src/db/backfill-product-codes.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.490.0",
@@ -47,6 +48,6 @@
     "@types/pdfkit": "^0.12.12",
     "@types/uuid": "^9.0.7",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "5.6.3"
   }
 }

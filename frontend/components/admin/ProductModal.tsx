@@ -534,7 +534,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">SKU (scan or enter barcode)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Barcode / UPC (scan or type)</label>
             <input
               type="text"
               value={formData.barcode ?? ''}
@@ -556,7 +556,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Product ID (admin only)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">SKU / item # (admin — used if barcode is missing)</label>
             <div className="flex gap-2">
               <input
                 type="text"

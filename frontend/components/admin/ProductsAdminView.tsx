@@ -32,6 +32,7 @@ interface Product {
   stock_quantity: number;
   low_stock_threshold?: number;
   barcode?: string;
+  plu?: string;
   category_id?: string;
   category_name?: string;
   image_url?: string;
@@ -383,12 +384,14 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
         const name = (p.name || '').toLowerCase();
         const sku = (p.sku || '').toLowerCase();
         const barcode = (p.barcode || '').toLowerCase();
+        const plu = (p.plu || '').toLowerCase();
         const desc = (p.description || '').toLowerCase();
         const cat = (p.category_name || '').toLowerCase();
         return (
           name.includes(searchLower) ||
           sku.includes(searchLower) ||
           barcode.includes(searchLower) ||
+          plu.includes(searchLower) ||
           desc.includes(searchLower) ||
           cat.includes(searchLower)
         );
