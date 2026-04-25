@@ -1,27 +1,32 @@
 /**
  * Run the workspace-installed TypeScript compiler explicitly (avoids a different `tsc`
  * on PATH e.g. TypeScript 6+ on some CI / Render images when the repo pins 5.6.x).
+ * Also works when the monorepo root is in `src/` (Render) or `typescript` is hoisted to parent.
  */
 const { spawnSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
 
 const backendDir = __dirname;
-const candidates = [
-  path.join(backendDir, 'node_modules', 'typescript', 'lib', 'tsc.js'),
-  path.join(backendDir, '..', 'node_modules', 'typescript', 'lib', 'tsc.js'),
+const searchBases = [
+  backendDir,
+  path.join(backendDir, '..'),
+  path.join(backendDir, '..', '..'),
 ];
 
 let tscPath;
-for (const p of candidates) {
-  if (fs.existsSync(p)) {
-    tscPath = p;
+for (const base of searchBases) {
+  try {
+    tscPath = require.resolve('typescript/lib/tsc.js', { paths: [base] });
     break;
+  } catch {
+    /* try next */
   }
 }
 
 if (!tscPath) {
-  console.error('run-tsc.cjs: Could not find typescript/lib/tsc.js. Run `npm install` at the monorepo root.');
+  console.error(
+    'run-tsc.cjs: Could not find typescript. Ensure `typescript` is installed (e.g. `npm install --include=dev` or see root .npmrc / backend dependencies).'
+  );
   process.exit(1);
 }
 
