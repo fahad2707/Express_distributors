@@ -24,13 +24,12 @@ if (!raw) {
 
 const line = `const API_BASE=${JSON.stringify(resolved)};`;
 const html = fs.readFileSync(file, 'utf8');
-const newHtml = html.replace(
-  /const API_BASE=(?:'[^']*'|"[^"]*");/,
-  line
-);
-if (newHtml === html) {
-  console.warn('inject-site-api: no `const API_BASE=...` line was replaced. Check public/site/index.html');
+const re = /const API_BASE=(?:'[^']*'|"[^"]*");/;
+if (!re.test(html)) {
+  console.warn('inject-site-api: no `const API_BASE=...` line was found. Check public/site/index.html');
   process.exit(1);
 }
+const newHtml = html.replace(re, line);
+// OK when the value is already correct (e.g. unset → "/api" matches on-disk)
 fs.writeFileSync(file, newHtml, 'utf8');
 console.log('inject-site-api: API_BASE =', resolved);
