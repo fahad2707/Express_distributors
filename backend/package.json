@@ -15,7 +15,8 @@
     "db:import-category-xls": "tsx src/db/import-batch-xls.ts",
     "db:import-all-category-xls": "tsx src/db/import-all-category-xls.ts",
     "assign-categories-csv": "tsx src/db/assignCategoriesFromFinalCsv.ts",
-    "db:backfill-product-codes": "tsx src/db/backfill-product-codes.ts"
+    "db:backfill-product-codes": "tsx src/db/backfill-product-codes.ts",
+    "db:apply-sku-excel": "tsx src/db/apply-sku-barcode-from-excel.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.490.0",
