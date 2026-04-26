@@ -44,12 +44,18 @@ export default function NewProductPage() {
   const [marginUsd, setMarginUsd] = useState('');
 
   useEffect(() => {
-    adminApi.get('/categories').then((r) => setCategories(r.data || [])).catch(() => {});
+    adminApi
+      .get('/categories')
+      .then((r) => setCategories(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {
     if (form.category_id) {
-      adminApi.get(`/sub-categories?category_id=${form.category_id}`).then((r) => setSubCategories(r.data || [])).catch(() => setSubCategories([]));
+      adminApi
+        .get(`/sub-categories?category_id=${form.category_id}`)
+        .then((r) => setSubCategories(Array.isArray(r.data) ? r.data : []))
+        .catch(() => setSubCategories([]));
       setForm((f) => ({ ...f, sub_category_id: '' }));
     } else {
       setSubCategories([]);

@@ -45,8 +45,9 @@ html:not(.use-custom-cursor) body::before{opacity:0;visibility:hidden}
   .mc.lit{animation:none!important}
 }
 @media(hover:hover) and (pointer:fine){
-  html.use-custom-cursor #dot{position:fixed;left:0;top:0;width:8px;height:8px;border-radius:50%;background:var(--gold);pointer-events:none;z-index:9999;transform:translate3d(-100px,-100px,0) translate(-50%,-50%)}
-  html.use-custom-cursor #ring{position:fixed;left:0;top:0;width:34px;height:34px;border:1px solid rgba(191,160,106,.4);border-radius:50%;pointer-events:none;z-index:9998;transform:translate3d(-100px,-100px,0) translate(-50%,-50%)}
+  /* Must sit above .product-modal-ov (10100) so the custom cursor is visible on the lightbox; .pm-close stays on top. */
+  html.use-custom-cursor #dot{position:fixed;left:0;top:0;width:8px;height:8px;border-radius:50%;background:var(--gold);pointer-events:none;z-index:10220;transform:translate3d(-100px,-100px,0) translate(-50%,-50%)}
+  html.use-custom-cursor #ring{position:fixed;left:0;top:0;width:34px;height:34px;border:1px solid rgba(191,160,106,.4);border-radius:50%;pointer-events:none;z-index:10210;transform:translate3d(-100px,-100px,0) translate(-50%,-50%)}
 }
 html:not(.use-custom-cursor) #dot,html:not(.use-custom-cursor) #ring{display:none!important}
 #loader{position:fixed;inset:0;z-index:8000;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .6s,visibility .6s}
@@ -168,6 +169,7 @@ html:not(.use-custom-cursor) #dot,html:not(.use-custom-cursor) #ring{display:non
 .hl-wheel{position:absolute;top:52%;left:50%;width:0;height:0;transform-style:preserve-3d}
 .hl-card{position:absolute;width:240px;height:340px;top:-170px;left:-120px;transform-style:preserve-3d}
 html.use-custom-cursor .hl-card{cursor:none}
+html.use-custom-cursor .hl-card .hl-foot,html.use-custom-cursor .hl-foot{cursor:pointer!important}
 .hl-card-face{width:100%;height:100%;background:rgba(18,18,21,.96);border:1px solid rgba(191,160,106,.12);border-top-color:rgba(191,160,106,.22);position:relative;overflow:hidden;transition:border-color .4s,box-shadow .4s;backface-visibility:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .hl-card-face{display:flex;flex-direction:column}
 .hl-card-face::before{content:'';position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.04) 0%,transparent 50%);pointer-events:none}
@@ -181,10 +183,11 @@ html.use-custom-cursor .hl-card{cursor:none}
 .hl-cat{font-family:var(--body);font-size:10px;font-weight:500;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
 .hl-name{font-family:var(--body);font-size:12.5px;font-weight:800;line-height:1.2;margin:10px 0 0;color:var(--cream);letter-spacing:.08em;text-transform:uppercase;text-align:center}
 .hl-desc{font-family:var(--body);font-size:12px;font-weight:300;color:var(--fog);line-height:1.6;margin-bottom:14px}
-.hl-foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:10px;padding-bottom:4px;flex-shrink:0;gap:8px}
-.hl-price{font-family:var(--body);font-size:13px;color:var(--gold);font-weight:500;letter-spacing:.06em;white-space:nowrap;line-height:1.2}
-.hl-add{width:30px;height:30px;flex-shrink:0;border:1px solid rgba(191,160,106,.35);color:var(--gold);font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .28s}
-.hl-add:hover{background:var(--gold);color:var(--ink)}
+.hl-foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:10px;padding-bottom:4px;flex-shrink:0;gap:8px;user-select:none;-webkit-tap-highlight-color:transparent;transition:opacity .2s}
+html.use-custom-cursor .hl-foot:hover{opacity:.95}
+.hl-price{font-family:var(--body);font-size:13px;color:var(--gold);font-weight:500;letter-spacing:.06em;white-space:nowrap;line-height:1.2;flex:1;min-width:0;pointer-events:none}
+.hl-add{width:30px;height:30px;flex-shrink:0;border:1px solid rgba(191,160,106,.35);color:var(--gold);font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .28s;pointer-events:none}
+.hl-foot:hover .hl-add{background:var(--gold);color:var(--ink);border-color:var(--gold)}
 .hl-ctrl{display:flex;justify-content:center;align-items:center;gap:22px;margin-top:20px;padding:0 56px}
 .hl-btn{width:44px;height:44px;border:1px solid var(--line);color:rgba(245,240,232,.5);font-size:17px;display:flex;align-items:center;justify-content:center;transition:all .3s}
 .hl-btn:hover{border-color:var(--gold);color:var(--gold)}
@@ -293,7 +296,7 @@ html.use-custom-cursor .hl-card{cursor:none}
 .pm-title{font-family:var(--body);font-size:clamp(1.15rem,4vw,2.4rem);font-weight:800;line-height:1.15;margin-bottom:12px;letter-spacing:.06em;text-transform:uppercase}
 .pm-price{font-size:clamp(1.35rem,5vw,1.85rem);font-weight:700;color:var(--gold);margin-bottom:16px}
 .pm-desc{font-size:14px;color:var(--fog);line-height:1.75}
-.pm-close{position:fixed;top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));z-index:10160;width:52px;height:52px;border:2px solid rgba(191,160,106,.65);border-radius:50%;color:var(--gold);font-size:30px;line-height:1;font-weight:300;display:flex;align-items:center;justify-content:center;background:rgba(10,10,12,.96);box-shadow:0 6px 24px rgba(0,0,0,.65);cursor:pointer;padding:0;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pm-close{position:fixed;top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));z-index:10300;width:52px;height:52px;border:2px solid rgba(191,160,106,.65);border-radius:50%;color:var(--gold);font-size:30px;line-height:1;font-weight:300;display:flex;align-items:center;justify-content:center;background:rgba(10,10,12,.96);box-shadow:0 6px 24px rgba(0,0,0,.65);cursor:pointer;padding:0;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .pm-close:active{opacity:.92}
 #why{padding:100px 0;position:relative;overflow:hidden;display:flex;align-items:center;min-height:0}
 .why-bg{position:absolute;inset:-18%;background:radial-gradient(ellipse 52% 68% at 16% 50%,rgba(191,160,106,.065),transparent 58%),linear-gradient(180deg,var(--ink) 0%,var(--ink2) 50%,var(--ink) 100%)}
@@ -543,7 +546,7 @@ const ro=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.targ
 document.querySelectorAll('.rv,.rvl,.rvr').forEach(el=>ro.observe(el));
 const mosaic=document.getElementById('mosaic');if(mosaic){const mcN=window.matchMedia('(max-width:768px)').matches?36:64;for(let i=0;i<mcN;i++){const c=document.createElement('div');c.className='mc';if(Math.random()>.85){c.classList.add('lit');c.style.animationDelay=(Math.random()*4)+'s';c.style.animationDuration=(3+Math.random()*3)+'s';}mosaic.appendChild(c);}}
 document.querySelectorAll('.stat-v').forEach(el=>{const obs=new IntersectionObserver(([e])=>{if(!e.isIntersecting)return;const raw=el.textContent.trim(),match=raw.match(/^([\d.]+)(K?[+%]?)$/);if(!match){obs.disconnect();return;}const num=parseFloat(match[1]),sfx=match[2];let cur=0;const step=num/52;const iv=setInterval(()=>{cur+=step;if(cur>=num){cur=num;clearInterval(iv);}el.textContent=(Number.isInteger(num)?Math.round(cur):cur.toFixed(1))+sfx;},20);obs.disconnect();},{threshold:.5});obs.observe(el);});
-const API_BASE='/api';
+const API_BASE="/api";
 const GLOW_COLORS=['#4facfe','#a78bfa','#60a5fa','#34d399','#fbbf24','#f97316','#fa709a','#4ade80','#22d3ee','#fb923c','#818cf8','#f87171','#ddd6fe','#f9a8d4'];
 function pickGlow(i){return GLOW_COLORS[i%GLOW_COLORS.length];}
 function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -618,9 +621,11 @@ function buildHighlights(cats){
       : '<span class="hl-letter">'+(d.cat?d.cat.charAt(0).toUpperCase():'P')+'</span>';
     card.innerHTML='<div class="hl-card-face"><div class="hl-emoji"><div class="hl-glow" style="background:radial-gradient(circle,'+d.glow+'40,transparent 70%)"></div>'+visual+'</div><div class="hl-info"><div class="hl-name">'+escHtml(d.cat)+'</div><div class="hl-foot"><span class="hl-price">'+escHtml(d.price)+'</span><button type="button" class="hl-add">→</button></div></div></div>';
     wheel.appendChild(card);
-    const hlAddBtn=card.querySelector('.hl-add');
-    if(hlAddBtn){
-      hlAddBtn.addEventListener('click',()=>{
+    const hlFoot=card.querySelector('.hl-foot');
+    if(hlFoot){
+      hlFoot.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        e.preventDefault();
         actFilt=d.catId?d.cat:'All';
         actFiltCatId=d.catId||'';
         visCount=24;

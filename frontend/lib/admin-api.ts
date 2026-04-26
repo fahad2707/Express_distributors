@@ -57,6 +57,13 @@ function isNetworkError(err: any) {
   return false;
 }
 
+function clearAdminSessionAndGoToLogin(configUrl?: string) {
+  if (configUrl?.includes('/auth/admin/login')) return;
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('adminToken');
+  window.location.href = '/admin/login';
+}
+
 // Retry once on network/connection failure (e.g. backend cold start on Render)
 adminApi.interceptors.response.use(
   (response) => response,
@@ -69,11 +76,17 @@ adminApi.interceptors.response.use(
       return adminApi.request(config);
     }
     if (error.response?.status === 401) {
-      const isLoginAttempt = config?.url?.includes('/auth/admin/login');
-      if (!isLoginAttempt && typeof window !== 'undefined') {
-        localStorage.removeItem('adminToken');
-        window.location.href = '/admin/login';
-      }
+      clearAdminSessionAndGoToLogin(config?.url);
+    }
+    return Promise.reject(error);
+  }
+);
+
+uploadApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      clearAdminSessionAndGoToLogin(error.config?.url);
     }
     return Promise.reject(error);
   }

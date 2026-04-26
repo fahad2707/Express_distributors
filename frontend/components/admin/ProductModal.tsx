@@ -356,11 +356,17 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
   const [marginUsd, setMarginUsd] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Defensive: never call .map/.find on a non-array (e.g. error object from a bad response).
+  const categoryList = Array.isArray(categories) ? categories : [];
+  const taxTypeList = Array.isArray(taxTypes) ? taxTypes : [];
+  const vendorList = Array.isArray(vendors) ? vendors : [];
+
   const fetchCategories = async () => {
     try {
       const response = await adminApi.get('/categories');
-      setCategories(response.data || []);
+      setCategories(Array.isArray(response.data) ? response.data : []);
     } catch {
+      setCategories([]);
       toast.error('Failed to load categories');
     }
   };
@@ -368,7 +374,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
     try {
       const url = categoryId ? `/sub-categories?category_id=${categoryId}` : '/sub-categories';
       const response = await adminApi.get(url);
-      setSubCategories(response.data || []);
+      setSubCategories(Array.isArray(response.data) ? response.data : []);
     } catch {
       setSubCategories([]);
     }
@@ -376,16 +382,20 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
   const fetchTaxTypes = async () => {
     try {
       const response = await adminApi.get('/tax-types');
-      setTaxTypes(response.data || []);
+      setTaxTypes(Array.isArray(response.data) ? response.data : []);
     } catch {
+      setTaxTypes([]);
       toast.error('Failed to load tax types');
     }
   };
   const fetchVendors = async () => {
     try {
       const response = await adminApi.get('/vendors');
-      setVendors(response.data?.vendors || response.data || []);
+      const d = response.data;
+      const list = Array.isArray(d?.vendors) ? d.vendors : Array.isArray(d) ? d : [];
+      setVendors(list);
     } catch {
+      setVendors([]);
       toast.error('Failed to load vendors');
     }
   };
@@ -437,7 +447,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
       setShowAddTax(true);
       return;
     }
-    const tax = taxTypes.find((t) => String(t.id) === value);
+    const tax = taxTypeList.find((t) => String(t.id) === value);
     setFormData({ ...formData, tax_rate: tax ? tax.rate : 0 });
   };
 
@@ -495,7 +505,9 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
     }
   };
 
-  const selectedCategoryName = formData.category_id ? categories.find((c) => String(c.id) === String(formData.category_id))?.name : '';
+  const selectedCategoryName = formData.category_id
+    ? categoryList.find((c) => String(c.id) === String(formData.category_id))?.name
+    : '';
 
   const costVal = Number(formData.cost_price) || 0;
   const sellVal = Number(formData.price) || 0;
@@ -666,7 +678,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
             >
               <option value="">Select category</option>
               <option value={ADD_CATEGORY}>+ Add new category</option>
-              {categories.map((cat) => (
+              {categoryList.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
@@ -680,13 +692,13 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tax type</label>
               <select
-                value={taxTypes.find((t) => t.rate === formData.tax_rate)?.id ?? ''}
+                value={taxTypeList.find((t) => t.rate === formData.tax_rate)?.id ?? ''}
                 onChange={(e) => handleTaxChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">No tax</option>
                 <option value={ADD_TAX}>+ Add tax type</option>
-                {taxTypes.map((t) => (
+                {taxTypeList.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.rate}%)
                   </option>
@@ -702,7 +714,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
               >
                 <option value="">Select supplier</option>
                 <option value={ADD_VENDOR}>+ Add new supplier</option>
-                {vendors.map((v) => (
+                {vendorList.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
                   </option>

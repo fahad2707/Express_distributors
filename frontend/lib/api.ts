@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { resolveApiBaseUrl } from './api-base-url';
+import { useAuthStore } from './store';
 
 const api = axios.create({
   headers: {
@@ -25,7 +26,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
+        useAuthStore.getState().logout();
         window.location.href = '/login';
       }
     }

@@ -87,7 +87,7 @@ export default function InventoryPage() {
   const fetchCategories = async () => {
     try {
       const res = await adminApi.get('/categories');
-      setCategories(res.data || []);
+      setCategories(Array.isArray(res.data) ? res.data : []);
     } catch {
       setCategories([]);
     }
@@ -96,7 +96,7 @@ export default function InventoryPage() {
   const fetchSubCategories = async () => {
     try {
       const res = await adminApi.get('/sub-categories');
-      setSubCategories(res.data || []);
+      setSubCategories(Array.isArray(res.data) ? res.data : []);
     } catch {
       setSubCategories([]);
     }
