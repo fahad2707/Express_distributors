@@ -17,6 +17,7 @@ import {
   Cell,
 } from 'recharts';
 import adminApi from '@/lib/admin-api';
+import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
 import toast from 'react-hot-toast';
 import { FileDown, FileText, DollarSign, TrendingDown, TrendingUp, Wallet, Percent } from 'lucide-react';
 
@@ -104,6 +105,9 @@ export default function AnalyticsPage() {
       setSalesData(combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
       setCategorySales(salesResponse.data.categorySales || []);
     } catch (error: any) {
+      if (isAdminAuthRedirectError(error)) {
+        return;
+      }
       toast.error(error.response?.data?.error || 'Failed to load analytics');
     } finally {
       setLoading(false);
@@ -126,6 +130,9 @@ export default function AnalyticsPage() {
       setExpenseBreakdown(breakdown.data.data || []);
       setFixedVsVariable(fixedVar.data.data || { fixed: 0, variable: 0 });
     } catch (e: any) {
+      if (isAdminAuthRedirectError(e)) {
+        return;
+      }
       console.error('Financial reports:', e);
       setFinancialOverview(null);
       setRevenueVsExpenses([]);

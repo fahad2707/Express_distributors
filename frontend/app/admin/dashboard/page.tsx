@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { DollarSign, ShoppingCart, TrendingUp, Wallet, ClipboardList, Tag, AlertTriangle } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
+import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
 import { toDisplayText } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -54,7 +55,10 @@ export default function AdminDashboard() {
     try {
       const res = await adminApi.get('/admin/dashboard', { params: { period: '365' } });
       setData(res.data);
-    } catch {
+    } catch (e) {
+      if (isAdminAuthRedirectError(e)) {
+        return;
+      }
       toast.error('Failed to load dashboard');
     } finally {
       setLoading(false);

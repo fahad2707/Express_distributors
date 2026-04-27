@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { resolveApiBaseUrl } from './api-base-url';
+import { ADMIN_AUTH_REDIRECT_MESSAGE } from './admin-auth-redirect';
 
 const adminApi = axios.create({
   headers: {
@@ -37,6 +38,15 @@ function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
     }
   }
   const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+  const path = String(config.url || '');
+  const isAuthLogin = path.includes('/auth/admin/login');
+
+  if (typeof window !== 'undefined' && !isAuthLogin && !token) {
+    if (window.location.pathname !== '/admin/login' && !window.location.pathname.startsWith('/admin/login')) {
+      window.location.replace('/admin/login');
+    }
+    return Promise.reject(new Error(ADMIN_AUTH_REDIRECT_MESSAGE));
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

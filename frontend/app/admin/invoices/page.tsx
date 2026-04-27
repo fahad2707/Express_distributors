@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Download, Mail, Plus, Edit2, Eye, DollarSign } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
+import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
 import toast from 'react-hot-toast';
 import InvoiceFormLightbox from '@/components/admin/InvoiceFormLightbox';
 import ReceivePaymentLightbox from '@/components/admin/ReceivePaymentLightbox';
@@ -51,6 +52,9 @@ export default function InvoicesPage() {
       const data = response.data;
       setInvoices(Array.isArray(data) ? data : (data.invoices || []));
     } catch (error) {
+      if (isAdminAuthRedirectError(error)) {
+        return;
+      }
       toast.error('Failed to load invoices');
     } finally {
       setLoading(false);
@@ -61,7 +65,10 @@ export default function InvoicesPage() {
     try {
       const res = await adminApi.get('/invoices/summary');
       setSummary({ totalPaid: res.data.totalPaid ?? 0, totalUnpaid: res.data.totalUnpaid ?? 0 });
-    } catch {
+    } catch (e) {
+      if (isAdminAuthRedirectError(e)) {
+        return;
+      }
       setSummary(null);
     }
   };

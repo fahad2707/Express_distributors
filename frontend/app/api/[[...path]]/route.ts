@@ -46,6 +46,12 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     }
     headers[key] = value;
   });
+  // Next/Vercel can omit Authorization from the iterable in some cases; the backend
+  // needs the Bearer token for all admin routes.
+  const auth = request.headers.get('authorization') || request.headers.get('Authorization');
+  if (auth) {
+    headers['Authorization'] = auth;
+  }
 
   const method = request.method.toUpperCase();
   let body: ArrayBuffer | undefined;

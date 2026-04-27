@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import adminApi, { uploadApi } from '@/lib/admin-api';
+import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
 import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 import ProductModal from '@/components/admin/ProductModal';
@@ -127,6 +128,9 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
       setProducts(response.data.products || []);
       setTotalCount(response.data.pagination?.total ?? (response.data.products?.length ?? 0));
     } catch (error) {
+      if (isAdminAuthRedirectError(error)) {
+        return;
+      }
       toast.error('Failed to load products');
     } finally {
       setLoading(false);
@@ -149,7 +153,10 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
           category_id: String(s.category_id || ''),
         }))
       );
-    } catch {
+    } catch (e) {
+      if (isAdminAuthRedirectError(e)) {
+        return;
+      }
       toast.error('Failed to load categories');
     }
   };

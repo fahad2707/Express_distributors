@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Search, Trash2, X, MapPin, FolderPlus } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
+import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
 import toast from 'react-hot-toast';
 
 interface Vendor {
@@ -57,7 +58,10 @@ export default function VendorsPage() {
     try {
       const res = await adminApi.get('/vendors', { params: search ? { search } : {} });
       setVendors(res.data.vendors || []);
-    } catch {
+    } catch (e) {
+      if (isAdminAuthRedirectError(e)) {
+        return;
+      }
       toast.error('Failed to load suppliers');
     } finally {
       setLoading(false);

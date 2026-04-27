@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -30,10 +30,11 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
+  // Run before child useEffects so data fetches see the token (or get blocked by admin-api).
+  useLayoutEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token && pathname !== '/admin/login') {
-      router.push('/admin/login');
+      router.replace('/admin/login');
     }
   }, [pathname, router]);
 
