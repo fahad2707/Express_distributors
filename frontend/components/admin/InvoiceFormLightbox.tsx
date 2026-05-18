@@ -45,16 +45,25 @@ interface LineItem {
   stock_quantity?: number;
 }
 
+export interface InvoiceInitialItem {
+  product_id?: string;
+  product_name: string;
+  category_name?: string;
+  quantity: number;
+}
+
 interface InvoiceFormLightboxProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (savedId?: string) => void;
   editId?: string | null;
   initialCustomerId?: string | null;
   initialDocumentType?: 'invoice' | 'quotation';
+  /** Prefill line items (e.g. when generating a quotation from an RFQ). */
+  initialItems?: InvoiceInitialItem[];
 }
 
-export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, initialCustomerId, initialDocumentType }: InvoiceFormLightboxProps) {
+export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, initialCustomerId, initialDocumentType, initialItems }: InvoiceFormLightboxProps) {
   const [dirty, setDirty] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -146,17 +155,64 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
         setInvoiceNumber(/^INV#\d+|^QTN#\d+/.test(num) ? num : (docType === 'quotation' ? 'QTN#001' : 'INV#001'));
       }).catch(() => setInvoiceNumber(docType === 'quotation' ? 'QTN#001' : 'INV#001'));
       const empty: LineItem[] = Array.from({ length: INITIAL_LINES }, () => ({ product_id: '', product_name: '', category_name: '', quantity: 1, price: 0, subtotal: 0 }));
-      setLines(empty);
-      setCustomerId('');
-      setCustomerName('');
-      setCustomerPhone('');
-      setCustomerEmail('');
-      setCustomerAddress('');
+      // Pre-fill lines from initialItems (e.g. generated from an RFQ). Product details
+      // (price, cost, stock) are resolved later once the /products fetch finishes.
+      if (initialItems && initialItems.length > 0) {
+        const prefilled: LineItem[] = initialItems.map((it) => ({
+          product_id: it.product_id || '',
+          product_name: it.product_name || '',
+          category_name: it.category_name || '',
+          quantity: Math.max(1, Number(it.quantity) || 1),
+          price: 0,
+          subtotal: 0,
+        }));
+        while (prefilled.length < INITIAL_LINES) prefilled.push({ product_id: '', product_name: '', category_name: '', quantity: 1, price: 0, subtotal: 0 });
+        setLines(prefilled);
+      } else {
+        setLines(empty);
+      }
+      if (!initialCustomerId) {
+        setCustomerId('');
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerEmail('');
+        setCustomerAddress('');
+      }
       setTerms('Due on receipt');
       setTaxAmount(0);
       setSelectedTaxTypeId('');
     }
-  }, [isOpen, editId, initialDocumentType]);
+  }, [isOpen, editId, initialDocumentType, initialItems, initialCustomerId]);
+
+  /**
+   * Once the products list loads, fill in price/cost for any prefilled lines
+   * that came in with only a product_id (e.g. RFQ-based quotation). We don't
+   * touch lines the user has already edited.
+   */
+  useEffect(() => {
+    if (!isOpen || editId || products.length === 0) return;
+    setLines((prev) => {
+      let changed = false;
+      const next = prev.map((l) => {
+        if (!l.product_id || l.price > 0) return l;
+        const p = products.find((q) => q.id === l.product_id);
+        if (!p) return l;
+        const customerPrice = customerPrices[p.id];
+        const usePrice = customerPrice ?? p.price ?? 0;
+        changed = true;
+        return {
+          ...l,
+          product_name: l.product_name || p.name,
+          category_name: l.category_name || p.category_name || '',
+          price: usePrice,
+          subtotal: l.quantity * usePrice,
+          cost_price: p.cost_price,
+          stock_quantity: p.stock_quantity,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [isOpen, editId, products, customerPrices]);
 
   useEffect(() => {
     if (isOpen && customerId) fetchCustomerPrices(customerId);
@@ -408,7 +464,7 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
         savedId = res.data?.id ?? editId ?? '';
       }
       setDirty(false);
-      onSaved();
+      onSaved(savedId);
       setSavedInvoiceId(savedId);
       setShowPdfModal(true);
       return true;

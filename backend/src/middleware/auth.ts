@@ -7,10 +7,30 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
+/**
+ * Extract a bearer token from the Authorization header. Robust against:
+ * - Duplicate Authorization headers (joined by Node as "Bearer a, Bearer b")
+ * - Stray commas / whitespace
+ * - Missing "Bearer " prefix (some clients send just the JWT)
+ */
+function extractBearerToken(headerValue: string | string[] | undefined): string | null {
+  if (!headerValue) return null;
+  const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  if (!raw) return null;
+  // If duplicated, Node concatenates with ", " — take just the first credential.
+  const first = raw.split(',')[0].trim();
+  if (!first) return null;
+  // "Bearer eyJ..." → "eyJ..."
+  const parts = first.split(/\s+/);
+  let token = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
+  token = token.trim().replace(/^,+|,+$/g, '');
+  return token || null;
+}
+
 export const authenticateUser = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
+    const token = extractBearerToken(req.headers.authorization);
+
     if (!token) {
       return res.status(401).json({ error: 'Authentication required' });
     }
@@ -25,14 +45,14 @@ export const authenticateUser = (req: AuthRequest, res: Response, next: NextFunc
 
 export const authenticateAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
+    const token = extractBearerToken(req.headers.authorization);
+
     if (!token) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { adminId: string; role: string };
-    
+
     if (decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -48,7 +68,7 @@ export const authenticateAdmin = (req: AuthRequest, res: Response, next: NextFun
 /** If a valid admin JWT is present, sets userRole; otherwise continues as guest (no 401). */
 export const optionalAuthenticateAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = extractBearerToken(req.headers.authorization);
     if (!token) return next();
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { adminId: string; role: string };
     if (decoded.adminId && String(decoded.role || '').toLowerCase() === 'admin') {

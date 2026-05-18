@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ShoppingCart, Star, Package } from 'lucide-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/lib/store';
-import { useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 
 interface Product {
@@ -16,17 +15,15 @@ interface Product {
   image_url?: string;
   description?: string;
   stock_quantity: number;
+  sku?: string;
 }
 
 export default function CategoryPage() {
   const params = useParams();
-  const router = useRouter();
-  const { token } = useAuthStore();
   const { addItem } = useCartStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [categoryName, setCategoryName] = useState('');
   const [loading, setLoading] = useState(true);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -36,8 +33,7 @@ export default function CategoryPage() {
     try {
       const response = await api.get(`/products?category=${params.slug}`);
       setProducts(response.data.products || []);
-      
-      // Try to get category name
+
       try {
         const catResponse = await api.get(`/categories/${params.slug}`);
         setCategoryName(catResponse.data.name);
@@ -52,21 +48,11 @@ export default function CategoryPage() {
   };
 
   const handleAddToCart = (product: Product) => {
-    if (!token) {
-      toast.error('Please login to add items to cart');
-      router.push('/login?redirect=/store/category/' + params.slug);
-      return;
-    }
-    
-    if (product.stock_quantity <= 0) {
-      toast.error('Product out of stock');
-      return;
-    }
-    
     addItem({
       product_id: product.id.toString(),
       name: product.name,
-      price: product.price,
+      // Prices are not used on the storefront anymore — RFQ flow only.
+      price: 0,
       image_url: product.image_url,
     });
     toast.success('Added to cart');
@@ -126,6 +112,14 @@ export default function CategoryPage() {
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
+                    {product.sku && (
+                      <span
+                        className="absolute top-3 left-1/2 -translate-x-1/2 bg-amber-300 text-slate-900 text-[10px] font-extrabold tracking-[0.18em] uppercase px-2.5 py-1 rounded-full shadow-md"
+                        aria-label={`Product ID ${product.sku}`}
+                      >
+                        #{product.sku}
+                      </span>
+                    )}
                     {product.stock_quantity <= 10 && product.stock_quantity > 0 && (
                       <div className="absolute top-3 right-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                         Low Stock
@@ -134,6 +128,14 @@ export default function CategoryPage() {
                   </div>
                 ) : (
                   <div className="h-64 bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center relative">
+                    {product.sku && (
+                      <span
+                        className="absolute top-3 left-1/2 -translate-x-1/2 bg-amber-300 text-slate-900 text-[10px] font-extrabold tracking-[0.18em] uppercase px-2.5 py-1 rounded-full shadow-md"
+                        aria-label={`Product ID ${product.sku}`}
+                      >
+                        #{product.sku}
+                      </span>
+                    )}
                     <span className="text-6xl text-white opacity-50 font-bold">
                       {product.name.charAt(0)}
                     </span>
@@ -149,20 +151,17 @@ export default function CategoryPage() {
                     </p>
                   )}
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-2xl font-bold text-primary-600">
-                      ${product.price.toFixed(2)}
-                    </p>
-                    {product.stock_quantity > 0 && (
-                      <div className="flex items-center gap-1 text-yellow-500">
-                        <Star className="w-4 h-4 fill-yellow-500" />
-                        <span className="text-sm font-semibold">4.5</span>
-                      </div>
-                    )}
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold tracking-widest uppercase text-primary-700 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
+                      Quote on request
+                    </span>
+                    <div className="flex items-center gap-1 text-yellow-500">
+                      <Star className="w-4 h-4 fill-yellow-500" />
+                      <span className="text-sm font-semibold">4.5</span>
+                    </div>
                   </div>
                   <button
                     onClick={() => handleAddToCart(product)}
-                    disabled={product.stock_quantity <= 0}
-                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                   >
                     <ShoppingCart className="w-5 h-5" />
                     Add to Cart

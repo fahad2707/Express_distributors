@@ -8,6 +8,8 @@ import {
   AlertCircle, CheckCircle2
 } from 'lucide-react';
 import adminApi, { posApi } from '@/lib/admin-api';
+import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
+import { formatApiError } from '@/lib/format-api-error';
 import toast from 'react-hot-toast';
 
 interface Product {
@@ -111,6 +113,7 @@ export default function POSPage() {
   
   const [loading, setLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const pluInputRef = useRef<HTMLInputElement>(null);
@@ -124,8 +127,10 @@ export default function POSPage() {
     try {
       const res = await adminApi.get('/customers');
       setCustomers(res.data.customers || []);
-    } catch {
-      // ignore
+    } catch (err) {
+      // The auth-redirect rejection is thrown when no admin token is present;
+      // the layout will redirect to login. Don't show a noisy toast.
+      if (isAdminAuthRedirectError(err)) return;
     }
   };
 
@@ -135,11 +140,16 @@ export default function POSPage() {
 
   const fetchProducts = async () => {
     setProductsLoading(true);
+    setProductsError(null);
     try {
-      const response = await adminApi.get('/products?limit=500');
-      setProducts(response.data.products || []);
+      const response = await adminApi.get('/products', { params: { limit: 500 } });
+      const list = response.data?.products;
+      setProducts(Array.isArray(list) ? list : []);
     } catch (error) {
-      toast.error('Failed to load products');
+      if (isAdminAuthRedirectError(error)) return;
+      const msg = formatApiError(error, 'Failed to load products');
+      setProductsError(msg);
+      toast.error(msg);
     } finally {
       setProductsLoading(false);
     }
@@ -378,7 +388,7 @@ export default function POSPage() {
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                     <Barcode className="w-4 h-4" />
                     Scan Barcode
                   </label>
@@ -394,7 +404,7 @@ export default function POSPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                     <Search className="w-4 h-4" />
                     Enter PLU Code
                   </label>
@@ -426,11 +436,40 @@ export default function POSPage() {
 
             {/* Products Grid */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">Products</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Products</h2>
+                {!productsLoading && (
+                  <button
+                    type="button"
+                    onClick={fetchProducts}
+                    className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Refresh
+                  </button>
+                )}
+              </div>
               {productsLoading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                   <span className="ml-3 text-gray-500">Loading products…</span>
+                </div>
+              ) : productsError ? (
+                <div className="py-12 text-center">
+                  <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-gray-900 mb-1">Couldn&apos;t load products</p>
+                  <p className="text-xs text-gray-600 mb-4 max-w-md mx-auto">{productsError}</p>
+                  <button
+                    type="button"
+                    onClick={fetchProducts}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-12 text-center text-gray-500">
+                  <p className="text-sm font-medium mb-1">No products found</p>
+                  <p className="text-xs">Add products from the Products page to get started.</p>
                 </div>
               ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[500px] overflow-y-auto">
@@ -628,7 +667,7 @@ export default function POSPage() {
               {/* Customer Info */}
               <div className="mb-4 space-y-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-1">
                     <User className="w-4 h-4" />
                     Select Customer
                   </label>
@@ -680,7 +719,7 @@ export default function POSPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-1">
                     Customer Name
                   </label>
                   <input
@@ -692,7 +731,7 @@ export default function POSPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-1">
                     <Phone className="w-4 h-4" />
                     Phone
                   </label>
@@ -705,7 +744,7 @@ export default function POSPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-1">
                     <Mail className="w-4 h-4" />
                     Email
                   </label>

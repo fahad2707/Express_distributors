@@ -13,6 +13,24 @@ export const uploadApi = axios.create({
   timeout: 60000,
 });
 
+/**
+ * Just-logged-in grace period (ms). Right after the user signs in we don't want
+ * a stray 401 — from a stale cached fetch, an aborted nav, dev-server Fast
+ * Refresh, etc. — to bounce them straight back to the login page. We log the
+ * failure to the console and toast (handled per-page) but keep the session.
+ */
+const LOGIN_GRACE_MS = 8000;
+const LOGIN_AT_KEY = 'adminLoginAt';
+
+function isWithinLoginGrace(): boolean {
+  if (typeof window === 'undefined') return false;
+  const raw = localStorage.getItem(LOGIN_AT_KEY);
+  if (!raw) return false;
+  const at = parseInt(raw, 10);
+  if (!at || Number.isNaN(at)) return false;
+  return Date.now() - at < LOGIN_GRACE_MS;
+}
+
 function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
   config.baseURL = resolveApiBaseUrl();
   // Default instance sets Content-Type: json — that breaks multipart (multer sees no file).
@@ -27,12 +45,10 @@ function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
     const direct = process.env.NEXT_PUBLIC_API_URL?.trim();
     if (direct) {
       let d = direct.replace(/\/+$/, '');
-      // Axios/fetch require scheme. Users often paste env without https://.
       if (!/^https?:\/\//i.test(d)) {
         if (/^(localhost|127\.0\.0\.1)(:|$)/i.test(d)) d = `http://${d}`;
         else d = `https://${d}`;
       }
-      // Ensure we end at ".../api" since axios call is "/products/..."
       if (!/\/api\/?$/i.test(d)) d = `${d}/api`;
       config.baseURL = d;
     }
@@ -42,9 +58,10 @@ function attachAdminAuth(config: import('axios').InternalAxiosRequestConfig) {
   const isAuthLogin = path.includes('/auth/admin/login');
 
   if (typeof window !== 'undefined' && !isAuthLogin && !token) {
-    if (window.location.pathname !== '/admin/login' && !window.location.pathname.startsWith('/admin/login')) {
-      window.location.replace('/admin/login');
-    }
+    // No token: reject the request and let the page / layout handle the
+    // redirect. We do NOT force a window.location.replace here — those
+    // hard redirects can race with the AdminLayoutClient's own check and
+    // wipe a fresh session that was set milliseconds earlier.
     return Promise.reject(new Error(ADMIN_AUTH_REDIRECT_MESSAGE));
   }
   if (token) {
@@ -70,8 +87,33 @@ function isNetworkError(err: any) {
 function clearAdminSessionAndGoToLogin(configUrl?: string) {
   if (configUrl?.includes('/auth/admin/login')) return;
   if (typeof window === 'undefined') return;
+
+  // Just-logged-in grace period: log loudly but don't yank the session.
+  // The most common cause of "logged in but bounced back" is a transient
+  // 401 (dev-server Fast Refresh, stale in-flight request, etc.) that
+  // arrives milliseconds after the new token was written.
+  if (isWithinLoginGrace()) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[admin-auth] Ignoring 401 within login grace period for "${configUrl}".`,
+      'If this keeps happening please share this URL — the backend rejected the just-issued token.'
+    );
+    return;
+  }
+
   localStorage.removeItem('adminToken');
-  window.location.href = '/admin/login';
+  localStorage.removeItem(LOGIN_AT_KEY);
+  // Don't fight ourselves if the user is already on the login page — that
+  // creates a confusing reload loop right after they enter credentials.
+  const path = window.location.pathname || '';
+  if (path === '/admin/login' || path.startsWith('/admin/login')) return;
+
+  // Use Next-friendly soft redirect when possible; window.location.replace
+  // as a fallback. Either way, log the URL that caused the bounce so the
+  // user can tell us if this happens again.
+  // eslint-disable-next-line no-console
+  console.warn(`[admin-auth] 401 on "${configUrl}" — clearing session and redirecting to /admin/login`);
+  window.location.replace('/admin/login');
 }
 
 // Retry once on network/connection failure (e.g. backend cold start on Render)
@@ -101,6 +143,11 @@ uploadApi.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export function markAdminLoggedInNow() {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
+}
 
 // POS API helpers
 export const posApi = {

@@ -33,17 +33,22 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   const qs = url.searchParams.toString();
   const target = `${backendBase}/api/${path}${qs ? `?${qs}` : ''}`;
 
+  // Build the outgoing header map case-insensitively. Previously we did a
+  // forEach (which lower-cases keys in Next.js) and THEN also set
+  // headers['Authorization'] explicitly — that produced two entries
+  // ("authorization" + "Authorization"). fetch sends both, the HTTP layer
+  // joins them with ", ", and Express sees `Bearer xxx, Bearer xxx` which
+  // breaks `split(' ')[1]` → JWT verification fails with 401.
   const headers: Record<string, string> = {};
+  const skipHeaders = new Set([
+    'host',
+    'connection',
+    'content-length',
+    'transfer-encoding',
+    'authorization', // handled explicitly below to avoid duplicates
+  ]);
   request.headers.forEach((value, key) => {
-    const lower = key.toLowerCase();
-    if (
-      lower === 'host' ||
-      lower === 'connection' ||
-      lower === 'content-length' ||
-      lower === 'transfer-encoding'
-    ) {
-      return;
-    }
+    if (skipHeaders.has(key.toLowerCase())) return;
     headers[key] = value;
   });
   // Next/Vercel can omit Authorization from the iterable in some cases; the backend

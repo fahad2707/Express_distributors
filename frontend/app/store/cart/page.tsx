@@ -1,83 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Minus, Trash2, ShoppingBag, Lock, Truck, CreditCard } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, Trash2, ShoppingCart, FileSignature, MessageSquare, Truck } from 'lucide-react';
 import { useCartStore } from '@/lib/store';
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
-import CheckoutForm from '@/components/CheckoutForm';
-import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { useAuthStore } from '@/lib/store';
-
-// Only load Stripe if key is available
-const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-const stripePromise = stripeKey && stripeKey !== '' ? loadStripe(stripeKey) : null;
+import RFQLightbox, { type RFQLightboxItem } from '@/components/RFQLightbox';
 
 export default function CartPage() {
-  const router = useRouter();
-  const { token } = useAuthStore();
-  const { items, updateQuantity, removeItem, getTotal, clearCart } = useCartStore();
-  const [showCheckout, setShowCheckout] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { items, updateQuantity, removeItem, clearCart } = useCartStore();
+  const [rfqOpen, setRfqOpen] = useState(false);
 
-  useEffect(() => {
-    // Require login to view cart
-    if (!token) {
-      router.push('/login?redirect=/store/cart');
+  const handleSubmitRFQ = () => {
+    if (items.length === 0) {
+      toast.error('Your cart is empty');
       return;
     }
-  }, [router, token]);
-
-  const handleCheckout = async () => {
-    if (!token) {
-      toast.error('Please login to checkout');
-      router.push('/login');
-      return;
-    }
-
-    // If Stripe is not configured, show message
-    if (!stripePromise) {
-      toast.error('Payment system not configured. Please contact support.');
-      return;
-    }
-
-    try {
-      const response = await api.post('/orders/create-payment-intent', {
-        amount: getTotal(),
-      });
-      setClientSecret(response.data.clientSecret);
-      setShowCheckout(true);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to initialize checkout');
-    }
+    setRfqOpen(true);
   };
 
-  if (showCheckout && clientSecret && stripePromise) {
-    return (
-      <div className="min-h-screen bg-[#0f1115] py-8">
-        <div className="container mx-auto px-4 max-w-3xl">
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <CheckoutForm
-              items={items as any}
-              total={getTotal()}
-              onSuccess={() => {
-                clearCart();
-                router.push('/store/orders');
-              }}
-              onCancel={() => setShowCheckout(false)}
-            />
-          </Elements>
-        </div>
-      </div>
-    );
-  }
-
-  const subtotal = getTotal();
-  const tax = 0;
-  const total = subtotal + tax;
+  const rfqItems: RFQLightboxItem[] = items.map((item) => ({
+    product_id: item.product_id,
+    product_name: item.name,
+    image_url: item.image_url,
+    quantity: item.quantity,
+  }));
 
   return (
     <div className="min-h-screen bg-[#0f1115] text-slate-50">
@@ -91,15 +38,17 @@ export default function CartPage() {
         </Link>
 
         <div className="flex items-center gap-3 mb-8">
-          <ShoppingBag className="w-8 h-8 text-[#7c5cff]" />
-          <h1 className="text-4xl font-bold text-slate-50 tracking-[0.04em]">Shopping Cart</h1>
+          <ShoppingCart className="w-8 h-8 text-[#7c5cff]" />
+          <h1 className="text-4xl font-bold text-slate-50 tracking-[0.04em]">Your Cart</h1>
         </div>
 
         {items.length === 0 ? (
           <div className="glass-panel p-12 text-center">
-            <ShoppingBag className="w-20 h-20 text-slate-500 mx-auto mb-4" />
+            <ShoppingCart className="w-20 h-20 text-slate-500 mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-slate-50 mb-2">Your cart is empty</h2>
-            <p className="text-slate-300 mb-6">Start adding items to your cart</p>
+            <p className="text-slate-300 mb-6">
+              Browse our products and add items to request a quote.
+            </p>
             <Link
               href="/"
               className="inline-flex items-center gap-2 glass-button glass-button-gradient px-6 py-3 rounded-lg font-semibold transition-all hover:scale-[1.03]"
@@ -109,7 +58,6 @@ export default function CartPage() {
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {items.map((item) => (
                 <div
@@ -133,8 +81,8 @@ export default function CartPage() {
                     <h3 className="font-semibold text-lg text-slate-50 mb-1 truncate">
                       {item.name.replace(/&/g, 'and')}
                     </h3>
-                    <p className="text-[#c7d2ff] font-bold text-lg mb-3">
-                      ${item.price.toFixed(2)}
+                    <p className="text-xs tracking-widest uppercase text-[#c7d2ff] mb-3">
+                      Pricing on request
                     </p>
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 border-2 border-white/15 rounded-lg">
@@ -144,7 +92,9 @@ export default function CartPage() {
                         >
                           <Minus className="w-4 h-4" />
                         </button>
-                        <span className="px-4 py-2 font-semibold min-w-[3rem] text-center text-slate-50">{item.quantity}</span>
+                        <span className="px-4 py-2 font-semibold min-w-[3rem] text-center text-slate-50">
+                          {item.quantity}
+                        </span>
                         <button
                           onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                           className="p-2 hover:bg-white/10 transition-colors"
@@ -152,14 +102,12 @@ export default function CartPage() {
                           <Plus className="w-4 h-4" />
                         </button>
                       </div>
-                      <p className="font-bold text-xl text-slate-50">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </p>
                     </div>
                   </div>
                   <button
                     onClick={() => removeItem(item.product_id)}
                     className="p-3 text-red-400 hover:bg-red-950/40 rounded-lg transition-colors self-start sm:self-center"
+                    aria-label="Remove from cart"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -167,65 +115,74 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="glass-panel p-6 sticky top-4">
-                <h2 className="text-2xl font-bold mb-6 text-slate-50">Order Summary</h2>
-                
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between text-slate-200">
-                    <span>Subtotal ({items.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
-                    <span className="font-semibold">${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-200">
-                    <span>Tax</span>
-                    <span className="font-semibold">${tax.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-200">
-                    <span>Shipping</span>
-                    <span className="font-semibold text-emerald-400">Free</span>
-                  </div>
-                  <div className="border-t border-white/15 pt-4 flex justify-between text-xl font-bold">
-                    <span className="text-slate-50">Total</span>
-                    <span className="text-[#c7d2ff]">${total.toFixed(2)}</span>
-                  </div>
-                </div>
+                <h2 className="text-2xl font-bold mb-2 text-slate-50">Request a Quote</h2>
+                <p className="text-sm text-slate-300 mb-4 leading-relaxed">
+                  Submit your details and our team will share competitive pricing on WhatsApp /
+                  email — usually within a few hours.
+                </p>
 
-                {!stripePromise && (
-                  <div className="mb-4 p-4 bg-amber-900/40 border border-amber-500/60 rounded-lg">
-                    <p className="text-sm text-amber-100">
-                      ⚠️ Payment system not configured. Add Stripe keys to enable checkout.
+                <div className="flex items-start gap-3 p-3 bg-[#c7d2ff]/5 border border-[#c7d2ff]/20 rounded-lg mb-4">
+                  <MessageSquare className="w-5 h-5 text-[#c7d2ff] mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-slate-200 leading-relaxed">
+                    <p className="font-semibold mb-1 uppercase tracking-widest text-[10px] text-[#c7d2ff]">
+                      Quote by WhatsApp
+                    </p>
+                    <p className="text-slate-300">
+                      We do not display prices online so competitors cannot compare. Submit a
+                      request and we will respond with pricing for your selected items.
                     </p>
                   </div>
-                )}
-
-                <button
-                  onClick={handleCheckout}
-                  disabled={!stripePromise}
-                  className="w-full glass-button glass-button-gradient text-white py-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 mb-4 shadow-lg"
-                >
-                  <Lock className="w-5 h-5" />
-                  {stripePromise ? 'Proceed to Checkout' : 'Payment Not Available'}
-                </button>
-
-                <div className="flex items-start gap-3 p-4 bg-white/5 rounded-lg">
-                  <Truck className="w-5 h-5 text-slate-200 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-slate-200">
-                    <p className="font-semibold mb-1">Store Pickup Only</p>
-                    <p className="text-slate-300">Your order will be ready for pickup at our store location.</p>
-                  </div>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 text-center">
-                    {stripePromise ? '🔒 Secure checkout powered by Stripe' : '💳 Payment setup required'}
-                  </p>
+                <p className="text-xs text-slate-400 mb-4">
+                  {items.reduce((s, it) => s + it.quantity, 0)} unit
+                  {items.reduce((s, it) => s + it.quantity, 0) === 1 ? '' : 's'} across{' '}
+                  {items.length} product{items.length === 1 ? '' : 's'}.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleSubmitRFQ}
+                  className="w-full glass-button glass-button-gradient text-white py-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-3 shadow-lg"
+                >
+                  <FileSignature className="w-5 h-5" />
+                  Submit Quote Request
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Clear your cart?')) clearCart();
+                  }}
+                  className="w-full text-xs text-slate-400 hover:text-slate-200 py-2 transition-colors"
+                >
+                  Clear cart
+                </button>
+
+                <div className="mt-6 pt-6 border-t border-white/10 flex items-start gap-3">
+                  <Truck className="w-5 h-5 text-slate-300 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-slate-300">
+                    <p className="font-semibold mb-1 text-slate-100">Pickup or Delivery</p>
+                    <p>Our team will arrange pickup at our PA warehouse or delivery as needed.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      <RFQLightbox
+        isOpen={rfqOpen}
+        onClose={() => setRfqOpen(false)}
+        items={rfqItems}
+        onSubmitted={() => {
+          clearCart();
+        }}
+        source="store"
+      />
     </div>
   );
 }

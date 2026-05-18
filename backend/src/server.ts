@@ -40,6 +40,7 @@ import shipmentRoutes from './modules/shipping/routes/shipments';
 import expenseRoutes from './modules/expenses/routes/expenses';
 import reportRoutes from './modules/reports/routes/reports';
 import onlineOrderRoutes from './routes/online-orders';
+import rfqRoutes from './routes/rfq';
 
 // Keep the process alive on unhandled promise rejections (e.g. async route errors)
 // so the server does not crash and you can see the logged error.
@@ -180,6 +181,7 @@ app.use('/api/receipts', receiptsRoutes);
 app.use('/api/credit-memos', creditMemoRoutes);
 app.use('/api/online-orders', onlineOrderRoutes);
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/rfq', rfqRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
 

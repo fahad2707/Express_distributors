@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -21,6 +21,7 @@ import {
   FolderTree,
   Wallet,
   Landmark,
+  MessageSquare,
 } from 'lucide-react';
 
 const SIDEBAR_BG = 'bg-[#0f766e]';
@@ -29,17 +30,40 @@ const SIDEBAR_ACTIVE = 'bg-teal-500';
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  // Start as `true` so children mount and may begin their data fetches.
+  // The auth check below will redirect away on the next paint if the token
+  // is genuinely missing. This avoids a blank flash for users who reload.
+  const [hasToken, setHasToken] = useState<boolean>(true);
 
-  // Run before child useEffects so data fetches see the token (or get blocked by admin-api).
-  useLayoutEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token && pathname !== '/admin/login') {
-      router.replace('/admin/login');
+  // Gate admin pages behind a localStorage token. We check after mount so
+  // SSR-safe code runs identically on the server, and react to "storage"
+  // events so logging out in one tab signs you out everywhere.
+  useEffect(() => {
+    if (pathname === '/admin/login') {
+      setHasToken(true);
+      return;
     }
+    const check = () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+      setHasToken(!!token);
+      if (!token) {
+        // Soft Next.js redirect — admin-api also redirects on 401 but only
+        // after the login grace period expires.
+        const target = `/admin/login?next=${encodeURIComponent(pathname || '/admin')}`;
+        router.replace(target);
+      }
+    };
+    check();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'adminToken') check();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [pathname, router]);
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminLoginAt');
     router.push('/admin/login');
   };
 
@@ -47,8 +71,17 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     return <>{children}</>;
   }
 
+  if (!hasToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
+        Redirecting to login…
+      </div>
+    );
+  }
+
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/rfq', label: 'Quote Requests', icon: MessageSquare },
     { href: '/admin/invoices', label: 'Invoice', icon: FileText },
     { href: '/admin/products', label: 'Products', icon: Package },
     { href: '/admin/catalog', label: 'Categories & Tax', icon: FolderTree },
