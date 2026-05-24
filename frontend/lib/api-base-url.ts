@@ -5,6 +5,11 @@ function normalizePublicApiUrl(envVal: string | undefined): string | null {
   const raw = envVal?.trim();
   if (!raw) return null;
   let s = raw.replace(/\/+$/, '');
+  // Same-origin path (Vercel Services: e.g. /express/api) — do not prepend https://
+  if (s.startsWith('/') && !s.startsWith('//')) {
+    if (!/\/api\/?$/i.test(s)) s = `${s}/api`;
+    return s.replace(/\/+$/, '');
+  }
   s = ensureFetchOriginForBackend(s);
   if (!/\/api\/?$/i.test(s)) s = `${s}/api`;
   return s.replace(/\/+$/, '');

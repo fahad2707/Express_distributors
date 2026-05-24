@@ -143,6 +143,26 @@ Your website is now:
 
 **Enjoy your amazing e-commerce website!** 🎉
 
+---
 
+## Deploying both frontend and backend on Vercel (Services)
 
-cd /Users/tahminachoudhury/Desktop/asif
+The repo includes a root **`vercel.json`** with **`experimentalServices`**: Next.js in `frontend/` at `/`, and Express in `backend/` under the **`/express`** path prefix (Vercel routes traffic by prefix; the backend still receives paths like `/api/...` after the prefix is handled).
+
+1. **Create / import the project** on Vercel and set the **Framework Preset** to **Services** (not plain Next.js).
+2. **Root directory** stays the **repository root** (where `vercel.json` lives).
+3. **Environment variables** (set for *Production*, *Preview*, and *Development* as needed):
+
+| Variable | Example | Purpose |
+|----------|---------|--------|
+| `NEXT_PUBLIC_API_URL` | `/express/api` | Browser + static `/site` calls hit the Express service (not Next’s `/api` proxy). |
+| `BACKEND_URL` | *(optional)* `https://YOUR-APP.vercel.app/express` | Next.js **server** proxy (`app/api/[[...path]]`) if you still use `/api` server-side; often optional if all clients use `NEXT_PUBLIC_API_URL`. |
+| `MONGODB_URI` | Atlas connection string | Required on **both** services (or at least on the API service). |
+| `JWT_SECRET` | strong random string | Backend auth. |
+| `FRONTEND_URL` | `https://YOUR-APP.vercel.app` | Backend CORS / redirects. |
+
+4. **Do not** point `NEXT_PUBLIC_API_URL` at plain `/api` on this setup if you expect traffic to reach Express: Next.js already owns `/api` for its App Router proxy. Use **`/express/api`** as above.
+
+5. **Services feature access**: Vercel documents **Services** as a product capability; if the dashboard blocks import, your team/plan may need Services enabled.
+
+6. After changing env vars, **redeploy** so `prebuild` runs `inject-site-api.cjs` with the new `NEXT_PUBLIC_API_URL`.

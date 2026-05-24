@@ -15,6 +15,11 @@ const raw = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 let resolved;
 if (!raw) {
   resolved = '/api';
+} else if (raw.startsWith('/') && !raw.startsWith('//')) {
+  // Same-origin path (e.g. Vercel Services backend at /express/api)
+  let u = raw.replace(/\/+$/, '');
+  if (!/\/api\/?$/i.test(u)) u = `${u}/api`;
+  resolved = u;
 } else {
   let u = raw.replace(/\/+$/, '');
   if (!/^https?:\/\//i.test(u)) u = u.includes('localhost') || u.includes('127.0.0.1') ? `http://${u}` : `https://${u}`;

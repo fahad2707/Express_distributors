@@ -16,6 +16,7 @@
     "db:import-all-category-xls": "tsx src/db/import-all-category-xls.ts",
     "assign-categories-csv": "tsx src/db/assignCategoriesFromFinalCsv.ts",
     "db:backfill-product-codes": "tsx src/db/backfill-product-codes.ts",
+    "db:assign-five-digit-skus": "tsx src/db/assign-five-digit-skus.ts",
     "db:apply-sku-excel": "tsx src/db/apply-sku-barcode-from-excel.ts"
   },
   "dependencies": {
