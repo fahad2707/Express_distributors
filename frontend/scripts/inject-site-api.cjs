@@ -4,7 +4,8 @@
  * - If NEXT_PUBLIC_API_URL is set (Vercel / production build), the browser will call
  *   your Render API directly (e.g. https://your-api.onrender.com/api). CORS on the
  *   backend must allow your Vercel origin (.vercel.app is already in server.ts).
- * - If unset, uses "/api" (Next.js /api proxy — requires BACKEND_URL on the Vercel server).
+ * - If unset: on Vercel (`VERCEL=1`) defaults to "/express/api" (Services layout); otherwise "/api"
+ *   (Next.js proxy — set BACKEND_URL on Vercel if you rely on /api).
  */
 const fs = require('fs');
 const path = require('path');
@@ -14,7 +15,8 @@ const raw = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
 let resolved;
 if (!raw) {
-  resolved = '/api';
+  // Match next.config.js: on Vercel builds, default to the Express service mount.
+  resolved = process.env.VERCEL === '1' ? '/express/api' : '/api';
 } else if (raw.startsWith('/') && !raw.startsWith('//')) {
   // Same-origin path (e.g. Vercel Services backend at /express/api)
   let u = raw.replace(/\/+$/, '');

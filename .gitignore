@@ -11,6 +11,7 @@ coverage
 # Backend user uploads only (not frontend/app/uploads API proxy routes)
 backend/uploads
 *.pem
+*.tsbuildinfo
 
 # Local data (do not publish)
 Asif badat.xlsx

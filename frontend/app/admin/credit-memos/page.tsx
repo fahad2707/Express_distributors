@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Plus, Search, CheckCircle, XCircle, X, FileText, Trash2, Download } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
 import toast from 'react-hot-toast';
+import { downloadPdfFromResponse, openPdfFromResponse } from '@/lib/download-pdf';
 import SearchableProductDropdown from '@/components/admin/SearchableProductDropdown';
 
 interface CreditMemoItem {
@@ -380,15 +381,9 @@ export default function CreditMemosPage() {
                             onClick={async () => {
                               try {
                                 const res = await adminApi.get(`/credit-memos/${cm.id}/pdf`, { responseType: 'blob' });
-                                const url = window.URL.createObjectURL(new Blob([res.data]));
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `credit-memo-${cm.credit_memo_number || cm.id}.pdf`;
-                                document.body.appendChild(a);
-                                a.click();
-                                a.remove();
-                                window.URL.revokeObjectURL(url);
-                                toast.success('PDF downloaded');
+                                if (downloadPdfFromResponse(res.data, `credit-memo-${cm.credit_memo_number || cm.id}.pdf`, res.headers['content-type'])) {
+                                  toast.success('PDF downloaded');
+                                }
                               } catch {
                                 toast.error('Failed to download PDF');
                               }
@@ -663,15 +658,9 @@ export default function CreditMemosPage() {
                 onClick={async () => {
                   try {
                     const res = await adminApi.get(`/credit-memos/${savedCreditMemoId}/pdf`, { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `credit-memo-${savedCreditMemoId}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    toast.success('PDF downloaded');
+                    if (downloadPdfFromResponse(res.data, `credit-memo-${savedCreditMemoId}.pdf`, res.headers['content-type'])) {
+                      toast.success('PDF downloaded');
+                    }
                   } catch {
                     toast.error('Failed to download PDF');
                   }
@@ -685,10 +674,9 @@ export default function CreditMemosPage() {
                 onClick={async () => {
                   try {
                     const res = await adminApi.get(`/credit-memos/${savedCreditMemoId}/pdf`, { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                    const w = window.open(url, '_blank');
-                    if (w) w.onload = () => w.print();
-                    toast.success('Opening print dialog');
+                    if (openPdfFromResponse(res.data, res.headers['content-type'])) {
+                      toast.success('Opening PDF for print');
+                    }
                   } catch {
                     toast.error('Failed to open PDF for printing');
                   }

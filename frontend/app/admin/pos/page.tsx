@@ -18,8 +18,7 @@ interface Product {
   price: number;
   cost_price?: number;
   stock_quantity?: number | null;
-  barcode?: string;
-  plu?: string;
+  product_id?: string;
   sku?: string;
   tax_rate?: number;
   image_url?: string;
@@ -88,9 +87,8 @@ export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState<'all' | 'barcode' | 'plu' | 'sku' | 'name'>('all');
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [pluInput, setPluInput] = useState('');
+  const [searchType, setSearchType] = useState<'all' | 'sku' | 'product_id' | 'name'>('all');
+  const [skuInput, setSkuInput] = useState('');
   
   // Customer info
   const [posCustomerId, setPosCustomerId] = useState<string | null>(null);
@@ -115,12 +113,11 @@ export default function POSPage() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
-  const pluInputRef = useRef<HTMLInputElement>(null);
+  const skuInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProducts();
-    barcodeInputRef.current?.focus();
+    skuInputRef.current?.focus();
   }, []);
 
   const fetchCustomers = async () => {
@@ -167,16 +164,14 @@ export default function POSPage() {
         toast.error('Product not found');
       } else if (foundProducts.length === 1) {
         addToCart(foundProducts[0]);
-        setBarcodeInput('');
-        setPluInput('');
-        barcodeInputRef.current?.focus();
+        setSkuInput('');
+        skuInputRef.current?.focus();
       } else {
         // Multiple results - show first or let user choose
         addToCart(foundProducts[0]);
         toast.success(`Added ${foundProducts[0].name}`);
-        setBarcodeInput('');
-        setPluInput('');
-        barcodeInputRef.current?.focus();
+        setSkuInput('');
+        skuInputRef.current?.focus();
       }
     } catch (error) {
       toast.error('Product not found');
@@ -185,15 +180,9 @@ export default function POSPage() {
     }
   };
 
-  const handleBarcodeScan = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && barcodeInput.trim()) {
-      searchProduct(barcodeInput, 'barcode');
-    }
-  };
-
-  const handlePLUEnter = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && pluInput.trim()) {
-      searchProduct(pluInput, 'plu');
+  const handleSkuScan = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && skuInput.trim()) {
+      searchProduct(skuInput, 'sku');
     }
   };
 
@@ -334,9 +323,8 @@ export default function POSPage() {
       setBillDiscount(0);
       setPaymentMethod('cash');
       setPaymentSplit({ cash: 0, card: 0, digital: 0 });
-      setBarcodeInput('');
-      setPluInput('');
-      barcodeInputRef.current?.focus();
+      setSkuInput('');
+      skuInputRef.current?.focus();
 
       // Optionally print/download invoice
       if (response.data?.invoice) {
@@ -355,8 +343,7 @@ export default function POSPage() {
     const term = searchTerm.toLowerCase();
     return (
       p.name.toLowerCase().includes(term) ||
-      p.barcode?.toLowerCase().includes(term) ||
-      p.plu?.toLowerCase().includes(term) ||
+      p.product_id?.toLowerCase().includes(term) ||
       p.sku?.toLowerCase().includes(term)
     );
   });
@@ -384,41 +371,23 @@ export default function POSPage() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Panel - Product Search & Selection */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Quick Input - Barcode & PLU */}
+            {/* Quick Input - SKU / Product ID */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                    <Barcode className="w-4 h-4" />
-                    Scan Barcode
-                  </label>
-                  <input
-                    ref={barcodeInputRef}
-                    type="text"
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    onKeyPress={handleBarcodeScan}
-                    placeholder="Scan or enter barcode"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg font-mono"
-                    disabled={searchLoading}
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                    <Search className="w-4 h-4" />
-                    Enter PLU Code
-                  </label>
-                  <input
-                    ref={pluInputRef}
-                    type="text"
-                    value={pluInput}
-                    onChange={(e) => setPluInput(e.target.value)}
-                    onKeyPress={handlePLUEnter}
-                    placeholder="Enter PLU code"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg font-mono"
-                    disabled={searchLoading}
-                  />
-                </div>
+              <div className="mb-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                  <Barcode className="w-4 h-4" />
+                  Scan SKU / Barcode or enter Product ID
+                </label>
+                <input
+                  ref={skuInputRef}
+                  type="text"
+                  value={skuInput}
+                  onChange={(e) => setSkuInput(e.target.value)}
+                  onKeyPress={handleSkuScan}
+                  placeholder="Scan UPC or type 5-digit Product ID"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg font-mono"
+                  disabled={searchLoading}
+                />
               </div>
 
               {/* Product Search */}
@@ -426,7 +395,7 @@ export default function POSPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by name, SKU, barcode, or PLU..."
+                  placeholder="Search by name, Product ID, or SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -498,8 +467,8 @@ export default function POSPage() {
                     <p className="text-primary-600 font-bold text-lg">${product.price.toFixed(2)}</p>
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-xs text-gray-500">
-                        {product.barcode && `BC: ${product.barcode}`}
-                        {product.plu && ` | PLU: ${product.plu}`}
+                        {product.product_id && `ID: ${product.product_id}`}
+                        {product.sku && ` | SKU: ${product.sku}`}
                       </p>
                       <span
                         className={`text-xs px-2 py-1 rounded ${

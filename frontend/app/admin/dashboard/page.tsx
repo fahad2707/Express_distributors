@@ -53,7 +53,7 @@ export default function AdminDashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await adminApi.get('/admin/dashboard', { params: { period: '365' } });
+      const res = await adminApi.get('/admin/dashboard', { params: { period: '90' } });
       setData(res.data);
     } catch (e) {
       if (isAdminAuthRedirectError(e)) {

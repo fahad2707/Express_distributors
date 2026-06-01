@@ -13,7 +13,6 @@ import {
   AlertCircle,
   FileDown,
   Layers,
-  Tags,
   RotateCcw,
   Image,
   ImageOff,
@@ -32,8 +31,7 @@ interface Product {
   price: number;
   stock_quantity: number;
   low_stock_threshold?: number;
-  barcode?: string;
-  plu?: string;
+  product_id?: string;
   category_id?: string;
   category_name?: string;
   image_url?: string;
@@ -103,9 +101,6 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [importResult, setImportResult] = useState<ImportExecuteResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const assignCategoriesFileRef = useRef<HTMLInputElement>(null);
-  const [assignCategoriesDryRun, setAssignCategoriesDryRun] = useState(true);
-  const [assignCategoriesBusy, setAssignCategoriesBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'out_of_stock'>('all');
@@ -225,48 +220,6 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
     setSelectedFile(null);
     setPreview(null);
     setImportResult(null);
-  };
-
-  const handleAssignCategoriesCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file?.name.toLowerCase().endsWith('.csv')) {
-      toast.error('Please choose a CSV file');
-      return;
-    }
-    setAssignCategoriesBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const q = assignCategoriesDryRun ? '?dry_run=1' : '';
-      const { data } = await uploadApi.post<{
-        csvRows: number;
-        updated: number;
-        unchanged: number;
-        skippedNoProduct: number;
-        skippedNoCategory: number;
-        unresolvedHints?: string[];
-        dryRun?: boolean;
-      }>(`/products/assign-categories-csv${q}`, fd);
-      const parts = [
-        assignCategoriesDryRun ? `Preview: would update ${data.updated}` : `Updated ${data.updated}`,
-        `unchanged ${data.unchanged}`,
-        `no match ${data.skippedNoProduct}`,
-        `no category ${data.skippedNoCategory}`,
-      ];
-      toast.success(parts.join(' · '), { duration: 6000 });
-      if (data.unresolvedHints?.length) {
-        toast(`Unresolved hints (rename categories or adjust CSV): ${data.unresolvedHints.slice(0, 8).join(', ')}`, {
-          icon: '⚠️',
-          duration: 8000,
-        });
-      }
-      if (!assignCategoriesDryRun && data.updated > 0) fetchProducts();
-    } catch (err: unknown) {
-      toast.error(formatApiError(err, 'Category assignment failed'));
-    } finally {
-      setAssignCategoriesBusy(false);
-    }
   };
 
   const toggleSelect = (id: string | number) => {
@@ -390,15 +343,13 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
     : products.filter((p) => {
         const name = (p.name || '').toLowerCase();
         const sku = (p.sku || '').toLowerCase();
-        const barcode = (p.barcode || '').toLowerCase();
-        const plu = (p.plu || '').toLowerCase();
+        const productId = (p.product_id || '').toLowerCase();
         const desc = (p.description || '').toLowerCase();
         const cat = (p.category_name || '').toLowerCase();
         return (
           name.includes(searchLower) ||
           sku.includes(searchLower) ||
-          barcode.includes(searchLower) ||
-          plu.includes(searchLower) ||
+          productId.includes(searchLower) ||
           desc.includes(searchLower) ||
           cat.includes(searchLower)
         );
@@ -490,7 +441,7 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search name, SKU, barcode, category, description…"
+            placeholder="Search name, Product ID, SKU, category, description…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-base"
@@ -616,43 +567,6 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
 
       {mode === 'active' && (
       <>
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 mb-6">
-        <h3 className="font-bold text-gray-900 flex items-center gap-2">
-          <Tags className="w-5 h-5 text-[#0f766e]" />
-          Assign categories from master CSV
-        </h3>
-        <p className="text-sm text-gray-600 mt-1 max-w-3xl">
-          Upload your <strong>final csv.csv</strong> (or same format: <strong>slug</strong>, <strong>category_slug</strong>, name, sku, barcode). Each row maps to a product;{' '}
-          <strong>category_slug</strong> is grouped into your top-level categories (General, Winter, E-Cigarettes, Candy &amp; Snacks, etc.). Matching: slug → SKU → barcode → name. Subcategories are cleared so only the main category applies.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <input
-            ref={assignCategoriesFileRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleAssignCategoriesCsv}
-          />
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={assignCategoriesDryRun}
-              onChange={(ev) => setAssignCategoriesDryRun(ev.target.checked)}
-              className="rounded border-gray-300 text-[#0f766e] focus:ring-[#0f766e]"
-            />
-            Preview only (dry run — no database changes)
-          </label>
-          <button
-            type="button"
-            disabled={assignCategoriesBusy}
-            onClick={() => assignCategoriesFileRef.current?.click()}
-            className="bg-[#0f766e]/10 text-[#0f766e] border border-[#0f766e]/30 px-5 py-2 rounded-lg font-semibold hover:bg-[#0f766e]/15 disabled:opacity-50"
-          >
-            {assignCategoriesBusy ? 'Processing…' : 'Choose CSV & assign'}
-          </button>
-        </div>
-      </div>
-
       {/* Import preview / progress / summary */}
       {importStep === 'preview' && preview && (
         <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
@@ -895,7 +809,8 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
                 <th className="text-left py-3 px-4 text-gray-700">Category</th>
                 <th className="text-right py-3 px-4 text-gray-700">Price</th>
                 <th className="text-right py-3 px-4 text-gray-700">Stock</th>
-                <th className="text-left py-3 px-4 text-gray-700">Barcode</th>
+                <th className="text-left py-3 px-4 text-gray-700">Product ID</th>
+                <th className="text-left py-3 px-4 text-gray-700">SKU</th>
                 <th className="text-right py-3 px-4 text-gray-700 min-w-[200px]">Actions</th>
               </tr>
             </thead>
@@ -928,7 +843,8 @@ export function ProductsAdminView({ mode }: { mode: ProductsAdminMode }) {
                       {product.stock_quantity}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-700 font-mono text-sm">{product.barcode || '-'}</td>
+                  <td className="py-3 px-4 text-gray-700 font-mono text-sm font-semibold">{product.product_id || '-'}</td>
+                  <td className="py-3 px-4 text-gray-700 font-mono text-sm">{product.sku || '-'}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-3 flex-wrap">
                       <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-gray-700">

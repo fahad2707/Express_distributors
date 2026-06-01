@@ -29,14 +29,13 @@ export default function NewProductPage() {
 
   const [form, setForm] = useState({
     name: '',
-    item_id: '',
+    sku: '',
     description: '',
     image_url: '',
     selling_price: '',
     cost_price: '',
     category_id: '',
     sub_category_id: '',
-    barcode: '',
     stock_quantity: '0',
     low_stock_threshold: '10',
   });
@@ -102,13 +101,12 @@ export default function NewProductPage() {
       await adminApi.post('/products', {
         name: form.name.trim(),
         description: form.description || undefined,
-        sku: form.item_id.trim() || undefined,
+        sku: form.sku.trim() || undefined,
         image_url: form.image_url || undefined,
         price: selling,
         cost_price: form.cost_price !== '' ? parseFloat(form.cost_price) : undefined,
         category_id: form.category_id || undefined,
         sub_category_id: form.sub_category_id || undefined,
-        barcode: form.barcode.trim() || undefined,
         stock_quantity: parseInt(form.stock_quantity, 10) || 0,
         low_stock_threshold: parseInt(form.low_stock_threshold, 10) || 10,
       });
@@ -129,7 +127,7 @@ export default function NewProductPage() {
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Add New Product</h1>
       <p className="text-gray-600 mb-6">
-        Product will appear on the website in the chosen category. Item ID and cost price are for admin only and are not shown to customers.
+        Product will appear on the website in the chosen category. A 5-digit Product ID is auto-generated on save. SKU is your barcode/UPC.
       </p>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow border border-gray-200 p-6 space-y-5">
@@ -145,14 +143,15 @@ export default function NewProductPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Item ID (admin only, not shown on website)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">SKU / Barcode (UPC)</label>
           <input
             type="text"
-            value={form.item_id}
-            onChange={(e) => setForm((f) => ({ ...f, item_id: e.target.value }))}
-            placeholder="Optional – leave blank to auto-generate"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            value={form.sku}
+            onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+            placeholder="Scan or type barcode / vendor SKU"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono"
           />
+          <p className="text-xs text-gray-500 mt-1">Product ID (5 digits) is created automatically when you save.</p>
         </div>
 
         <div>
@@ -298,17 +297,6 @@ export default function NewProductPage() {
         </div>
 
         {/* Subcategory intentionally hidden in UI; still supported by API if set elsewhere */}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Barcode (for Billing / scanning)</label>
-          <input
-            type="text"
-            value={form.barcode}
-            onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
-            placeholder="Optional"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2"
-          />
-        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>

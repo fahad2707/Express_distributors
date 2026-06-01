@@ -1,91 +1,55 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import fs from 'fs';
-import path from 'path';
-import PDFDocument from 'pdfkit';
 import PurchaseOrder from '../models/PurchaseOrder';
 import Product from '../models/Product';
 import StockMovement from '../models/StockMovement';
 import Vendor from '../models/Vendor';
-import StoreSettings from '../models/StoreSettings';
 import { authenticateAdmin, AuthRequest } from '../middleware/auth';
+import { buildBusinessDocumentPdf } from '../utils/businessDocPdf';
+import { sendPdfResponse } from '../utils/pdfHelpers';
 import { z } from 'zod';
 import { postVendorLedger } from '../modules/vendors/services/vendorLedgerService';
 import { LedgerReferenceType } from '../shared/enums';
 
 const router = express.Router();
-const MARGIN = 50;
-const PAGE_WIDTH = 595;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const TEAL = '#0f766e';
 
-async function generatePOPDF(po: any): Promise<string> {
-  const uploadsDir = path.join(__dirname, '../../uploads/purchase-orders');
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  const filename = `po-${po.po_number || po._id}.pdf`;
-  const filepath = path.join(uploadsDir, filename);
-  if (fs.existsSync(filepath)) {
-    try { fs.unlinkSync(filepath); } catch (_) {}
-  }
-  const doc = new PDFDocument({ margin: MARGIN, size: 'A4' });
-  const stream = fs.createWriteStream(filepath);
-  doc.pipe(stream);
-  const settings = await StoreSettings.findOne().lean().catch(() => null) as any;
-  const businessName = settings?.business_name || 'Express Distributors Inc';
-  let y = MARGIN;
-  doc.fillColor(TEAL);
-  doc.fontSize(18);
-  doc.font('Helvetica-Bold');
-  doc.text(businessName, MARGIN, y);
-  doc.fillColor('black');
-  doc.font('Helvetica');
-  y += 28;
-  doc.fontSize(14);
-  doc.text('PURCHASE ORDER', MARGIN, y);
-  y += 22;
-  doc.fontSize(10);
+async function generatePOPDFBuffer(po: any): Promise<Buffer> {
   const poNumber = po.po_number || po._id?.toString() || '—';
-  const vendorName = (po.vendor_id as any)?.name ?? po.vendor_id ?? '—';
-  const created = po.created_at ? new Date(po.created_at).toLocaleDateString('en-US') : '—';
-  doc.text(`PO Number: ${poNumber}`, MARGIN, y);
-  doc.text(`Vendor: ${vendorName}`, MARGIN, y + 14);
-  doc.text(`Date: ${created}`, MARGIN, y + 28);
-  y += 50;
-  doc.fontSize(10);
-  doc.font('Helvetica-Bold');
-  const colName = MARGIN;
-  const colQty = colName + 220;
-  const colCost = colQty + 60;
-  const colTotal = colCost + 80;
-  doc.text('Product', colName, y);
-  doc.text('Qty', colQty, y);
-  doc.text('Unit Cost', colCost, y);
-  doc.text('Subtotal', colTotal, y);
-  doc.font('Helvetica');
-  y += 18;
-  const items = po.items || [];
-  for (const item of items) {
-    const name = item.product_name || '—';
-    const qty = item.quantity_ordered ?? 0;
-    const cost = item.unit_cost ?? 0;
-    const subtotal = (item.subtotal ?? (qty * cost));
-    doc.text(name.substring(0, 35), colName, y);
-    doc.text(String(qty), colQty, y);
-    doc.text(Number(cost).toFixed(2), colCost, y);
-    doc.text(Number(subtotal).toFixed(2), colTotal, y);
-    y += 18;
-  }
-  y += 10;
-  doc.font('Helvetica-Bold');
-  doc.text(`Subtotal: ${Number(po.subtotal ?? 0).toFixed(2)}`, MARGIN, y);
-  doc.text(`Tax: ${Number(po.tax_amount ?? 0).toFixed(2)}`, MARGIN, y + 14);
-  doc.text(`Total: ${Number(po.total_amount ?? 0).toFixed(2)}`, MARGIN, y + 28);
-  doc.end();
-  await new Promise<void>((resolve, reject) => {
-    stream.on('finish', resolve);
-    stream.on('error', reject);
+  const vendor = po.vendor_id as any;
+  const vendorName = vendor?.name ?? '—';
+  const vendorLines: string[] = [];
+  if (vendor?.phone) vendorLines.push(`Tel: ${vendor.phone}`);
+  if (vendor?.city || vendor?.state) vendorLines.push([vendor.city, vendor.state].filter(Boolean).join(', '));
+  const created = po.created_at
+    ? new Date(po.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+  const items = (po.items || []).map((item: any) => ({
+    name: item.product_name || 'Product',
+    qty: item.quantity_ordered ?? 0,
+    unitPrice: Number(item.unit_cost ?? 0),
+    lineTotal: Number(item.subtotal ?? (item.quantity_ordered ?? 0) * (item.unit_cost ?? 0)),
+  }));
+
+  return buildBusinessDocumentPdf({
+    title: 'PURCHASE ORDER',
+    subtitle: poNumber,
+    partyLabel: 'Vendor',
+    partyName: vendorName,
+    partyLines: vendorLines,
+    meta: [
+      { label: 'PO number', value: poNumber },
+      { label: 'Date', value: created },
+      { label: 'Status', value: String(po.status || '—') },
+      { label: 'Expected', value: po.expected_date ? new Date(po.expected_date).toLocaleDateString('en-US') : '—' },
+    ],
+    items,
+    totals: [
+      { label: 'Subtotal', value: `$${Number(po.subtotal ?? 0).toFixed(2)}` },
+      { label: 'Tax', value: `$${Number(po.tax_amount ?? 0).toFixed(2)}` },
+      { label: 'Total', value: `$${Number(po.total_amount ?? 0).toFixed(2)}`, bold: true },
+    ],
+    itemColumns: { showProductId: false },
   });
-  return filepath;
 }
 
 const generatePONumber = () => `P${String(Math.floor(10000 + Math.random() * 90000))}`;
@@ -138,9 +102,9 @@ router.get('/:id/pdf', authenticateAdmin, async (req: AuthRequest, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id).populate('vendor_id').lean();
     if (!po) return res.status(404).json({ error: 'Purchase order not found' });
-    const filepath = await generatePOPDF(po);
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.download(filepath);
+    const buffer = await generatePOPDFBuffer(po);
+    const filename = `po-${po.po_number || req.params.id}.pdf`;
+    sendPdfResponse(res, buffer, filename);
   } catch (error) {
     console.error('PO PDF error:', error);
     res.status(500).json({ error: 'Failed to generate PDF' });

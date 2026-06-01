@@ -22,8 +22,7 @@ interface Product {
   vendor_id?: string | number;
   tax_rate?: number;
   image_url?: string;
-  barcode?: string;
-  plu?: string;
+  product_id?: string;
   sku?: string;
   stock_quantity: number;
   low_stock_threshold: number;
@@ -339,8 +338,7 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
     vendor_id: undefined,
     tax_rate: 0,
     image_url: '',
-    barcode: '',
-    plu: '',
+    product_id: '',
     sku: '',
     stock_quantity: 0,
     low_stock_threshold: 10,
@@ -546,14 +544,44 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Barcode / UPC (scan or type)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">SKU / Barcode (scan or type UPC)</label>
             <input
               type="text"
-              value={formData.barcode ?? ''}
-              onChange={(e) => setFormData({ ...formData, barcode: e.target.value, plu: e.target.value })}
-              placeholder="Scan barcode or enter"
+              value={formData.sku ?? ''}
+              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+              placeholder="Scan barcode or enter vendor SKU / UPC"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Product ID</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.product_id ?? ''}
+                readOnly
+                placeholder={product?.id ? 'Assigned on save' : 'Auto-generated on save'}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-mono"
+              />
+              {!product?.id && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const { data } = await adminApi.get('/products/generate-id');
+                      setFormData((prev) => ({ ...prev, product_id: data.product_id || data.item_id || '' }));
+                    } catch {
+                      toast.error('Failed to generate Product ID');
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 whitespace-nowrap"
+                >
+                  Preview ID
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">5-digit unique ID — permanent once saved. Shown on the website and used in POS.</p>
           </div>
 
           <div>
@@ -565,33 +593,6 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
               required
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">SKU / item # (admin — used if barcode is missing)</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={formData.sku ?? ''}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                placeholder="Leave blank to auto-generate"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const { data } = await adminApi.get('/products/generate-id');
-                    setFormData((prev) => ({ ...prev, sku: data.item_id || '' }));
-                  } catch {
-                    toast.error('Failed to generate Product ID');
-                  }
-                }}
-                className="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 whitespace-nowrap"
-              >
-                Generate
-              </button>
-            </div>
           </div>
 
           <div>

@@ -31,7 +31,18 @@ export function resolveApiBaseUrl(): string {
     return '/api';
   }
   const fromPub = normalizePublicApiUrl(process.env.NEXT_PUBLIC_API_URL);
-  if (fromPub) return fromPub;
+  if (fromPub) {
+    // Server-side fetch/axios needs an absolute URL; browser can keep same-origin paths.
+    if (
+      fromPub.startsWith('/') &&
+      !fromPub.startsWith('//') &&
+      process.env.VERCEL_URL?.trim()
+    ) {
+      const origin = `https://${process.env.VERCEL_URL.trim().replace(/\/+$/, '')}`;
+      return `${origin}${fromPub}`.replace(/\/+$/, '');
+    }
+    return fromPub;
+  }
   const backend = process.env.BACKEND_URL?.trim();
   if (backend) {
     const base = ensureFetchOriginForBackend(

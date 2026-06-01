@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { X, Trash2 } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
 import toast from 'react-hot-toast';
+import { downloadPdfFromResponse, openPdfFromResponse } from '@/lib/download-pdf';
 import SearchableProductDropdown, { type ProductOption } from './SearchableProductDropdown';
 
 const LOCATION_OF_SALE = '511 W Germantown Pike, Plymouth Meeting, PA 19462-1303';
@@ -858,15 +859,9 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
                 onClick={async () => {
                   try {
                     const res = await adminApi.get(`/invoices/${savedInvoiceId}/pdf`, { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `invoice-${savedInvoiceId}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    toast.success('PDF downloaded');
+                    if (downloadPdfFromResponse(res.data, `invoice-${savedInvoiceId}.pdf`, res.headers['content-type'])) {
+                      toast.success('PDF downloaded');
+                    }
                   } catch {
                     toast.error('Failed to download PDF');
                   }
@@ -880,10 +875,9 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
                 onClick={async () => {
                   try {
                     const res = await adminApi.get(`/invoices/${savedInvoiceId}/pdf`, { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                    const w = window.open(url, '_blank');
-                    if (w) w.onload = () => w.print();
-                    toast.success('Opening print dialog');
+                    if (openPdfFromResponse(res.data, res.headers['content-type'])) {
+                      toast.success('Opening PDF for print');
+                    }
                   } catch {
                     toast.error('Failed to open PDF for printing');
                   }

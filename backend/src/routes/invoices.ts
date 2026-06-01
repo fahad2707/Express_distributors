@@ -7,10 +7,9 @@ import StoreSettings from '../models/StoreSettings';
 import Product from '../models/Product';
 import CustomerProductPrice from '../models/CustomerProductPrice';
 import { authenticateAdmin, AuthRequest } from '../middleware/auth';
-import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
 import nodemailer from 'nodemailer';
+import { buildInvoicePdfBuffer } from '../utils/invoicePdfLayout';
+import { sendPdfResponse } from '../utils/pdfHelpers';
 
 const router = express.Router();
 
@@ -34,11 +33,6 @@ async function saveCustomerProductPrices(customerId: string | mongoose.Types.Obj
   }
 }
 
-const PAGE_WIDTH = 595;
-const PAGE_HEIGHT = 842;
-const MARGIN = 50;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-
 // Email transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -49,216 +43,6 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS,
   },
 });
-
-const TEAL = '#0f766e';
-const GRAY_HEADER = '#374151';
-const LIGHT_BG = '#f3f4f6';
-const BORDER_GRAY = '#e5e7eb';
-
-// Generate PDF invoice: logo top-left, clean layout, straight watermark, product SKU as item ID, minimal color
-const generateInvoicePDF = async (invoice: any, items: any[], skuMap: Record<string, string> = {}): Promise<string> => {
-  const filename = `invoice-${invoice.invoice_number}.pdf`;
-  const uploadsDir = path.join(__dirname, '../../uploads/invoices');
-  const uploadsRoot = path.join(__dirname, '../../uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  const filepath = path.join(uploadsDir, filename);
-  if (fs.existsSync(filepath)) {
-    try { fs.unlinkSync(filepath); } catch (_) {}
-  }
-
-  const doc = new PDFDocument({ margin: MARGIN, size: 'A4' });
-  doc.pipe(fs.createWriteStream(filepath));
-
-  const settings = await StoreSettings.findOne().lean().catch(() => null) as any;
-  const businessName = settings?.business_name || 'Express Distributors Inc';
-  const addressParts = [settings?.address, settings?.city, settings?.state, settings?.zip].filter(Boolean);
-  const companyAddress = addressParts.length ? addressParts.join(', ') : '';
-  const companyPhone = settings?.phone || '';
-  const companyWebsite = settings?.website || 'www.expressdistributors.com';
-  const logoPath = settings?.logo_url ? (path.isAbsolute(settings.logo_url) ? settings.logo_url : path.join(uploadsRoot, settings.logo_url)) : '';
-
-  // ----- Watermark: straight (horizontal), centered, light gray -----
-  doc.save();
-  doc.fillColor('#e5e7eb');
-  doc.fontSize(52);
-  doc.font('Helvetica-Bold');
-  doc.text(businessName.toUpperCase(), MARGIN, PAGE_HEIGHT / 2 - 18, { width: CONTENT_WIDTH, align: 'center' });
-  doc.restore();
-
-  // ----- Header: Logo (top-left) then company details -----
-  let y = MARGIN;
-  const headerLeft = MARGIN;
-  let contentStartX = headerLeft;
-  if (logoPath && fs.existsSync(logoPath)) {
-    try {
-      doc.image(logoPath, headerLeft, y, { width: 88, height: 44 });
-      contentStartX = headerLeft + 100;
-    } catch (_) {}
-  }
-  doc.fillColor(GRAY_HEADER);
-  doc.fontSize(18);
-  doc.font('Helvetica-Bold');
-  doc.text(businessName, contentStartX, y);
-  doc.font('Helvetica');
-  doc.fontSize(10);
-  doc.fillColor('#6b7280');
-  doc.text(companyAddress || '—', contentStartX, y + 20);
-  doc.text(companyWebsite, contentStartX, y + 32);
-  if (companyPhone) doc.text(`Phone: ${companyPhone}`, contentStartX, y + 44);
-  doc.fillColor('black');
-
-  y += 58;
-  doc.strokeColor(TEAL);
-  doc.lineWidth(1.5);
-  doc.moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).stroke();
-  doc.lineWidth(1);
-  doc.strokeColor('black');
-  y += 12;
-  doc.fillColor(TEAL);
-  doc.fontSize(14);
-  doc.font('Helvetica-Bold');
-  doc.text('INVOICE', MARGIN, y);
-  doc.fillColor('black');
-  doc.font('Helvetica');
-  y += 20;
-
-  // ----- Order details (left) | Ship To (right) -----
-  const orderDate = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : (invoice.created_at ? new Date(invoice.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—');
-  const terms = invoice.terms || (invoice.payment_method === 'cash' ? 'C.O.D. - CASH' : invoice.payment_method || '—');
-  const shippingType = invoice.shipping_type || invoice.invoice_type || 'Ground Shipping';
-  doc.fontSize(10);
-  doc.fillColor(GRAY_HEADER);
-  doc.font('Helvetica-Bold');
-  doc.text('Order No.:', MARGIN, y);
-  doc.font('Helvetica');
-  doc.fillColor('black');
-  doc.text(invoice.invoice_number, MARGIN + 58, y);
-  doc.text(`Order Date: ${orderDate}`, MARGIN, y + 14);
-  doc.text(`Terms: ${terms}`, MARGIN, y + 28);
-  doc.text(`Shipping Type: ${shippingType}`, MARGIN, y + 42);
-
-  const shipToLines = [];
-  if (invoice.customer_name) shipToLines.push(invoice.customer_name);
-  if (invoice.customer_address) shipToLines.push(invoice.customer_address);
-  if (invoice.customer_phone && !invoice.customer_address) shipToLines.push(invoice.customer_phone);
-  if (invoice.customer_email) shipToLines.push(invoice.customer_email);
-  const shipToText = shipToLines.length ? shipToLines.join(', ') : '—';
-  doc.fillColor(GRAY_HEADER);
-  doc.font('Helvetica-Bold');
-  doc.text('Ship To', PAGE_WIDTH - MARGIN - 220, y, { width: 220, align: 'right' });
-  doc.font('Helvetica');
-  doc.fillColor('black');
-  doc.fontSize(9);
-  doc.text(shipToText, PAGE_WIDTH - MARGIN - 220, y + 12, { width: 220, align: 'right' });
-
-  y += 56;
-  doc.strokeColor(BORDER_GRAY);
-  doc.moveTo(MARGIN, y).lineTo(PAGE_WIDTH - MARGIN, y).stroke();
-  doc.strokeColor('black');
-  y += 16;
-
-  // ----- Order Items table -----
-  doc.fillColor(TEAL);
-  doc.fontSize(12);
-  doc.font('Helvetica-Bold');
-  doc.text('Order Items', MARGIN, y, { width: CONTENT_WIDTH, align: 'center' });
-  doc.fillColor('black');
-  doc.font('Helvetica');
-  y += 18;
-
-  // Wider product-name column, no promo discount column
-  const colQty = MARGIN;
-  const colId = colQty + 32;
-  const colName = colId + 60;
-  const colUnitCost = PAGE_WIDTH - MARGIN - 140;
-  const colTotalCost = PAGE_WIDTH - MARGIN - 60;
-  doc.fillColor(LIGHT_BG);
-  doc.rect(MARGIN, y, PAGE_WIDTH - 2 * MARGIN, 18).fill();
-  doc.strokeColor(BORDER_GRAY);
-  doc.rect(MARGIN, y, PAGE_WIDTH - 2 * MARGIN, 18).stroke();
-  doc.fillColor('black');
-  doc.strokeColor('black');
-  doc.fillColor(GRAY_HEADER);
-  doc.fontSize(9);
-  doc.font('Helvetica-Bold');
-  doc.text('Qty', colQty + 4, y + 5);
-  doc.text('Item ID', colId, y + 5);
-  doc.text('Product Name', colName, y + 5);
-  doc.text('Unit price', colUnitCost, y + 5, { width: 60, align: 'right' });
-  doc.text('Amount', colTotalCost, y + 5, { width: 60, align: 'right' });
-  doc.fillColor('black');
-  doc.font('Helvetica');
-  y += 20;
-
-  const itemTotal = items.reduce((sum: number, i: any) => sum + parseFloat(i.subtotal || 0), 0);
-  const discountAmount = invoice.discount_amount ?? 0;
-  const taxAmount = invoice.tax_amount ?? 0;
-  const adjustment = invoice.adjustment ?? 0;
-
-  items.forEach((item: any, idx: number) => {
-    const pid = item.product_id ? String(item.product_id) : '';
-    const itemId = skuMap[pid] || item.sku || (pid ? pid : '—');
-    const name = item.product_name || 'Product';
-    if (idx > 0) doc.strokeColor(BORDER_GRAY).moveTo(MARGIN, y - 2).lineTo(PAGE_WIDTH - MARGIN, y - 2).stroke().strokeColor('black');
-    doc.fontSize(9);
-    doc.text(String(item.quantity ?? 0), colQty + 4, y);
-    doc.text(String(itemId).slice(0, 20), colId, y, { width: 52 });
-    doc.text(name, colName, y, { width: colUnitCost - colName - 12 });
-    doc.text(parseFloat(item.price || 0).toFixed(2), colUnitCost, y, { width: 60, align: 'right' });
-    doc.text(parseFloat(item.subtotal || 0).toFixed(2), colTotalCost, y, { width: 60, align: 'right' });
-    y += 16;
-  });
-
-  y += 10;
-
-  // ----- Summary box (teal border, light background) -----
-  const summaryX = PAGE_WIDTH - MARGIN - 180;
-  const summaryY = y;
-  doc.fillColor('#f0fdfa');
-  doc.rect(summaryX - 10, summaryY - 6, 200, 84).fill();
-  doc.strokeColor(TEAL);
-  doc.rect(summaryX - 10, summaryY - 6, 200, 84).stroke();
-  doc.fillColor('black');
-  doc.strokeColor('black');
-  doc.fillColor(GRAY_HEADER);
-  doc.fontSize(9);
-  doc.font('Helvetica');
-  doc.text('Item Total', summaryX, y, { width: 90, align: 'right' });
-  doc.fillColor('black');
-  doc.text(itemTotal.toFixed(2), summaryX + 90, y, { width: 90, align: 'right' });
-  y += 14;
-  doc.fillColor(GRAY_HEADER);
-  doc.text('Tax', summaryX, y, { width: 90, align: 'right' });
-  doc.fillColor('black');
-  doc.text(taxAmount.toFixed(2), summaryX + 90, y, { width: 90, align: 'right' });
-  y += 14;
-  doc.fillColor(GRAY_HEADER);
-  doc.text('Adjustment', summaryX, y, { width: 90, align: 'right' });
-  doc.fillColor('black');
-  doc.text(adjustment.toFixed(2), summaryX + 90, y, { width: 90, align: 'right' });
-  y += 18;
-  doc.fillColor(TEAL);
-  doc.font('Helvetica-Bold');
-  doc.fontSize(12);
-  doc.text('Grand Total', summaryX, y, { width: 90, align: 'right' });
-  doc.fillColor('black');
-  doc.text(parseFloat(invoice.total_amount || 0).toFixed(2), summaryX + 90, y, { width: 90, align: 'right' });
-  doc.font('Helvetica');
-  y += 16;
-
-  doc.fontSize(8);
-  doc.fillColor('#9ca3af');
-  doc.text('Page 1/1', MARGIN, PAGE_HEIGHT - MARGIN - 12);
-
-  doc.end();
-
-  return new Promise((resolve, reject) => {
-    doc.on('end', () => resolve(filepath));
-    doc.on('error', reject);
-  });
-};
 
 // Summary: total paid = sum(amount_paid), total unpaid = sum(total_amount - amount_paid) so timeline matches table
 router.get('/summary', authenticateAdmin, async (_req, res) => {
@@ -496,17 +280,16 @@ router.get('/:id/pdf', authenticateAdmin, async (req: AuthRequest, res) => {
 
     const items = invoice.items || [];
     const productIds = [...new Set((items || []).map((i: any) => i.product_id).filter(Boolean))];
-    const products = productIds.length ? await Product.find({ _id: { $in: productIds } }).select('sku').lean() : [];
-    const skuMap: Record<string, string> = {};
-    products.forEach((p: any) => { skuMap[p._id.toString()] = p.sku || p._id.toString(); });
-    const filepath = await generateInvoicePDF(invoice, items, skuMap);
-
-    if (!invoice.pdf_path) {
-      await Invoice.findByIdAndUpdate(req.params.id, { pdf_path: filepath });
-    }
-
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    res.download(filepath);
+    const products = productIds.length
+      ? await Product.find({ _id: { $in: productIds } }).select('product_id sku').lean()
+      : [];
+    const idMap: Record<string, string> = {};
+    products.forEach((p: any) => {
+      idMap[p._id.toString()] = p.product_id || p.sku || p._id.toString();
+    });
+    const buffer = await buildInvoicePdfBuffer(invoice as any, items as any[], idMap);
+    const filename = `invoice-${(invoice as any).invoice_number || req.params.id}.pdf`;
+    sendPdfResponse(res, buffer, filename);
   } catch (error) {
     console.error('Generate PDF error:', error);
     res.status(500).json({ error: 'Failed to generate PDF' });
@@ -695,17 +478,15 @@ router.post('/:id/send-email', authenticateAdmin, async (req: AuthRequest, res) 
 
     const items = invoice.items || [];
     const productIds = [...new Set((items || []).map((i: any) => i.product_id).filter(Boolean))];
-    const products = productIds.length ? await Product.find({ _id: { $in: productIds } }).select('sku').lean() : [];
-    const skuMap: Record<string, string> = {};
-    products.forEach((p: any) => { skuMap[p._id.toString()] = p.sku || p._id.toString(); });
+    const products = productIds.length
+      ? await Product.find({ _id: { $in: productIds } }).select('product_id sku').lean()
+      : [];
+    const idMap: Record<string, string> = {};
+    products.forEach((p: any) => {
+      idMap[p._id.toString()] = p.product_id || p.sku || p._id.toString();
+    });
+    const pdfBuffer = await buildInvoicePdfBuffer(invoice as any, items as any[], idMap);
 
-    let filepath = invoice.pdf_path;
-    if (!filepath || !fs.existsSync(filepath)) {
-      filepath = await generateInvoicePDF(invoice, items, skuMap);
-      await Invoice.findByIdAndUpdate(req.params.id, { pdf_path: filepath });
-    }
-
-    // Send email
     await transporter.sendMail({
       from: process.env.SMTP_USER,
       to: invoice.customer_email,
@@ -714,7 +495,8 @@ router.post('/:id/send-email', authenticateAdmin, async (req: AuthRequest, res) 
       attachments: [
         {
           filename: `invoice-${invoice.invoice_number}.pdf`,
-          path: filepath,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
         },
       ],
     });

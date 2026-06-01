@@ -12,9 +12,10 @@ export interface IProduct extends Document {
   category_id?: mongoose.Types.ObjectId;
   sub_category_id?: mongoose.Types.ObjectId;
   image_url?: string;
-  barcode?: string;
-  plu?: string; // Price Look-Up code for non-barcode items
-  sku?: string; // Stock Keeping Unit
+  product_id?: string; // Permanent 5-digit store ID (POS + website badge)
+  barcode?: string; // Legacy — prefer sku for UPC
+  plu?: string; // Legacy — unused
+  sku?: string; // Barcode / UPC / vendor SKU (scannable)
   stock_quantity: number;
   committed_quantity: number; // Reserved by open orders (available = stock_quantity - committed_quantity)
   low_stock_threshold: number;
@@ -37,9 +38,10 @@ const ProductSchema = new Schema<IProduct>(
     category_id: { type: Schema.Types.ObjectId, ref: 'Category' },
     sub_category_id: { type: Schema.Types.ObjectId, ref: 'SubCategory' },
     image_url: String,
+    product_id: { type: String, unique: true, sparse: true },
     barcode: { type: String, unique: true, sparse: true },
-    plu: { type: String, unique: true, sparse: true }, // PLU code
-    sku: { type: String, unique: true, sparse: true }, // SKU
+    plu: { type: String, unique: true, sparse: true },
+    sku: { type: String, unique: true, sparse: true },
     stock_quantity: { type: Number, default: 0 },
     committed_quantity: { type: Number, default: 0 }, // Reserved by open orders
     low_stock_threshold: { type: Number, default: 10 },

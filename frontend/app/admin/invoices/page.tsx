@@ -5,6 +5,7 @@ import { Search, Download, Mail, Plus, Edit2, Eye, DollarSign } from 'lucide-rea
 import adminApi from '@/lib/admin-api';
 import { isAdminAuthRedirectError } from '@/lib/admin-auth-redirect';
 import toast from 'react-hot-toast';
+import { downloadPdfFromResponse } from '@/lib/download-pdf';
 import InvoiceFormLightbox from '@/components/admin/InvoiceFormLightbox';
 import ReceivePaymentLightbox from '@/components/admin/ReceivePaymentLightbox';
 
@@ -86,14 +87,10 @@ export default function InvoicesPage() {
   const handleDownloadPDF = async (invoiceId: string) => {
     try {
       const response = await adminApi.get(`/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `invoice-${invoiceId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success('Invoice downloaded');
+      const ct = response.headers['content-type'] as string | undefined;
+      if (downloadPdfFromResponse(response.data, `invoice-${invoiceId}.pdf`, ct)) {
+        toast.success('Invoice downloaded');
+      }
     } catch (error) {
       toast.error('Failed to download invoice');
     }

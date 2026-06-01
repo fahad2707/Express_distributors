@@ -4,9 +4,10 @@
  * (Category, Subcategory, Product_Name, Price_USD, etc.).
  */
 
-import { parse } from 'csv-parse/sync';
+import { parseCsvRecords } from '../utils/csvParseRecords';
 import mongoose from 'mongoose';
 import Product from '../models/Product';
+import { generateProductId } from '../utils/productCodes';
 import Category from '../models/Category';
 import SubCategory from '../models/SubCategory';
 
@@ -118,18 +119,17 @@ function getCell(row: Record<string, string>, ...keys: string[]): string {
 }
 
 /** Parse CSV buffer into array of keyed rows (first row = headers). */
-export function parseCsv(buffer: Buffer): Record<string, string>[] {
-  const raw = buffer.toString('utf-8').trim();
-  if (!raw) return [];
-  const records = parse(raw, {
+export async function parseCsv(buffer: Buffer): Promise<Record<string, string>[]> {
+  const raw = buffer.toString('utf-8');
+  if (!raw.trim()) return [];
+  return parseCsvRecords<Record<string, string>>(raw, {
     columns: true,
     skip_empty_lines: true,
     trim: true,
     relax_column_count: true,
     bom: true,
     cast: false,
-  }) as Record<string, string>[];
-  return records;
+  });
 }
 
 /** Normalize a raw CSV row to canonical shape. Handles both sample format and structured format. */
@@ -239,8 +239,8 @@ function nextBarcode(used: Set<string>): string {
  * Build preview: parse CSV, normalize each row, validate, detect duplicates (by name+subcategory).
  * Does not touch the database (except optionally for duplicate check - we'll do duplicate check in execute using session).
  */
-export function buildPreview(buffer: Buffer): ImportPreviewResult {
-  const records = parseCsv(buffer);
+export async function buildPreview(buffer: Buffer): Promise<ImportPreviewResult> {
+  const records = await parseCsv(buffer);
   const rows: ImportRowResult[] = [];
   const seenKey = new Set<string>(); // "category|subcategory|name" for duplicate detection within file
   let valid = 0;
@@ -294,7 +294,7 @@ export async function executeImport(
   buffer: Buffer,
   options: { skipDuplicatesByNameInSubcategory?: boolean } = {}
 ): Promise<ImportExecuteResult> {
-  const preview = buildPreview(buffer);
+  const preview = await buildPreview(buffer);
   const { skipDuplicatesByNameInSubcategory = true } = options;
 
   const errors: { row: number; message: string }[] = [];
@@ -391,24 +391,26 @@ export async function executeImport(
         }
 
         const slug = makeSlug(data.name, usedSlugs);
-        const skuRaw = (data.sku && data.sku.trim()) || null;
-        const sku = skuRaw && !usedSkus.has(skuRaw) ? (usedSkus.add(skuRaw), skuRaw) : nextSku(usedSkus);
-        const barcodeRaw = (data.barcode && data.barcode.trim()) || null;
-        const barcode = barcodeRaw && !usedBarcodes.has(barcodeRaw) ? (usedBarcodes.add(barcodeRaw), barcodeRaw) : nextBarcode(usedBarcodes);
-        let pluToStore: string | undefined;
-        if (data.plu && data.plu.trim()) {
-          const p = data.plu.trim();
-          if (!usedPlus.has(p)) {
-            usedPlus.add(p);
-            pluToStore = p;
-          }
+        const skuCandidate =
+          (data.barcode && data.barcode.trim()) ||
+          (data.sku && data.sku.trim()) ||
+          (data.plu && data.plu.trim()) ||
+          null;
+        let sku: string | undefined;
+        if (skuCandidate && !usedSkus.has(skuCandidate)) {
+          usedSkus.add(skuCandidate);
+          sku = skuCandidate;
+        } else if (skuCandidate) {
+          sku = skuCandidate;
         }
+        const product_id = await generateProductId();
 
         await Product.create(
           [
             {
               name: data.name,
               slug,
+              product_id,
               description: data.description,
               product_type: 'inventory',
               price: data.price,
@@ -416,8 +418,6 @@ export async function executeImport(
               category_id: categoryId,
               sub_category_id: subCategoryId ?? undefined,
               sku,
-              barcode,
-              ...(pluToStore !== undefined && { plu: pluToStore }),
               stock_quantity: data.stock_quantity,
               low_stock_threshold: data.low_stock_threshold,
               tax_rate: data.tax_rate,

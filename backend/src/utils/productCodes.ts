@@ -1,97 +1,127 @@
 import Product from '../models/Product';
 
+/** True when value looks like a permanent 5-digit product ID (not a UPC). */
+export function isFiveDigitProductId(v: string): boolean {
+  return /^\d{5}$/.test(String(v ?? '').trim());
+}
+
+/** True when value looks like a scannable SKU / UPC (long numeric or alphanumeric). */
+export function isLongSkuCode(v: string): boolean {
+  const t = String(v ?? '').trim();
+  if (!t) return false;
+  if (isFiveDigitProductId(t)) return false;
+  return t.length >= 8 || /^\d{6,}$/.test(t);
+}
+
 /**
  * Generate a permanent 5-digit product identifier (10000–99999).
- *
- * Once stored on a product (as `sku`) this value is never regenerated or
- * mutated — every callsite first checks whether the product already has a
- * SKU and only invokes this helper when the field is empty.
- *
- * If the 5-digit space is exhausted (or we get repeated collisions), we
- * widen the search to 6 digits to keep new product creation working. This
- * keeps the contract "all newly issued IDs are 5 digits where possible"
- * while remaining safe at scale.
+ * Stored in `product_id` — never regenerated once assigned.
  */
-export async function generateItemId(): Promise<string> {
+export async function generateProductId(): Promise<string> {
   for (let i = 0; i < 30; i++) {
     const id = String(Math.floor(10000 + Math.random() * 90000));
-    const exists = await Product.findOne({ sku: id }).lean();
+    const exists = await Product.findOne({ product_id: id }).lean();
     if (!exists) return id;
   }
-  // Fallback: 6 digits if the 5-digit space is full.
   for (let i = 0; i < 20; i++) {
     const id = String(Math.floor(100000 + Math.random() * 900000));
-    const exists = await Product.findOne({ sku: id }).lean();
+    const exists = await Product.findOne({ product_id: id }).lean();
     if (!exists) return id;
   }
   return String(Date.now() % 100000).padStart(5, '0');
 }
 
 /**
- * Fills empty SKU and/or barcode from barcode, PLU, or a generated id:
- * - If SKU is empty, uses barcode, then PLU, then a new generated SKU.
- * - If barcode is empty and SKU is set, copies SKU to barcode (when not taken by another product)
- *   so scanning at POS “barcode” and GET /products/barcode/:code can resolve the product.
+ * One-time migration for existing catalog (~1400+ products):
+ * - Long UPC/barcode values → `sku`
+ * - Short 5-digit values wrongly stored in `sku` → `product_id`
+ * - Assign new `product_id` where missing
+ * - Clear legacy `barcode` / `plu` (no longer used)
  */
-export async function backfillProductSkuAndBarcode(): Promise<{
+export async function migrateProductIdAndSku(): Promise<{
   updated: number;
   examined: number;
   skippedNoChange: number;
   warnings: string[];
 }> {
   const products = await Product.find({})
-    .select('_id sku barcode plu')
+    .select('_id product_id sku barcode plu')
     .lean();
   const examined = products.length;
   const warnings: string[] = [];
   let updated = 0;
   let skippedNoChange = 0;
 
-  for (const p of products as { _id: { toString: () => string }; sku?: string; barcode?: string; plu?: string }[]) {
+  const usedProductIds = new Set<string>();
+  for (const p of products) {
+    const pid = String((p as { product_id?: string }).product_id || '').trim();
+    if (pid) usedProductIds.add(pid);
+  }
+
+  for (const p of products as {
+    _id: { toString: () => string };
+    product_id?: string;
+    sku?: string;
+    barcode?: string;
+    plu?: string;
+  }[]) {
     const oid = p._id;
     const id = oid.toString();
-    let newSku = (p.sku || '').trim();
-    let newBc = (p.barcode || '').trim();
-    const plu = (p.plu || '').trim();
-    const origSku = newSku;
-    const origBc = newBc;
+    let productId = String(p.product_id || '').trim();
+    let sku = String(p.sku || '').trim();
+    const barcode = String(p.barcode || '').trim();
+    const plu = String(p.plu || '').trim();
+    const origProductId = productId;
+    const origSku = sku;
 
-    if (!newSku) {
-      if (newBc) {
-        const taken = await Product.findOne({ sku: newBc, _id: { $ne: oid } }).lean();
-        if (!taken) newSku = newBc;
-        else warnings.push(`[${id}] Cannot set SKU from barcode — "${newBc}" already used as another product's SKU.`);
+    const longCandidates = [barcode, plu, isLongSkuCode(sku) ? sku : ''].filter(Boolean);
+    let longSku = longCandidates[0] || '';
+
+    if (!productId && sku && isFiveDigitProductId(sku)) {
+      productId = sku;
+      sku = longSku;
+    } else if (!productId && sku && isLongSkuCode(sku)) {
+      longSku = sku;
+      sku = sku;
+    } else if (!sku && longSku) {
+      sku = longSku;
+    } else if (!sku && barcode && !isFiveDigitProductId(barcode)) {
+      sku = barcode;
+    } else if (!sku && plu && !isFiveDigitProductId(plu)) {
+      sku = plu;
+    }
+
+    if (!productId) {
+      let candidate = '';
+      for (let attempt = 0; attempt < 40; attempt++) {
+        candidate = await generateProductId();
+        if (!usedProductIds.has(candidate)) break;
       }
-    }
-    if (!newSku && plu) {
-      const taken = await Product.findOne({ sku: plu, _id: { $ne: oid } }).lean();
-      if (!taken) newSku = plu;
-      else warnings.push(`[${id}] Cannot set SKU from PLU — "${plu}" already used as another product's SKU.`);
-    }
-    if (!newSku) {
-      newSku = (await generateItemId()).trim();
+      if (usedProductIds.has(candidate)) {
+        warnings.push(`[${id}] Could not allocate unique product_id`);
+        continue;
+      }
+      productId = candidate;
+      usedProductIds.add(productId);
     }
 
-    if (newSku && !newBc) {
-      const taken = await Product.findOne({ barcode: newSku, _id: { $ne: oid } }).lean();
-      if (!taken) newBc = newSku;
-      else
-        warnings.push(
-          `[${id}] Skipped copying SKU to barcode — "${newSku}" already used as another product's barcode.`
-        );
-    }
-
-    if (newSku === origSku && newBc === origBc) {
+    if (productId === origProductId && sku === origSku && !barcode && !plu) {
       skippedNoChange++;
       continue;
     }
 
-    const setDoc: { sku?: string; barcode?: string; updated_at: Date } = { updated_at: new Date() };
-    if (newSku !== origSku) setDoc.sku = newSku;
-    if (newBc !== origBc) setDoc.barcode = newBc;
-
     try {
-      await Product.updateOne({ _id: oid }, { $set: setDoc });
+      await Product.updateOne(
+        { _id: oid },
+        {
+          $set: {
+            product_id: productId,
+            sku: sku || undefined,
+            updated_at: new Date(),
+          },
+          $unset: { barcode: 1, plu: 1 },
+        }
+      );
       updated++;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Eye, FileText, Truck, Search, X, Trash2, Download } from 'lucide-react';
 import adminApi from '@/lib/admin-api';
 import toast from 'react-hot-toast';
+import { downloadPdfFromResponse, openPdfFromResponse } from '@/lib/download-pdf';
 import Link from 'next/link';
 import SearchableProductDropdown from '@/components/admin/SearchableProductDropdown';
 
@@ -316,15 +317,9 @@ export default function PurchaseOrdersPage() {
                             onClick={async () => {
                               try {
                                 const res = await adminApi.get(`/purchase-orders/${po.id}/pdf`, { responseType: 'blob' });
-                                const url = window.URL.createObjectURL(new Blob([res.data]));
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `po-${po.po_number || po.id}.pdf`;
-                                document.body.appendChild(a);
-                                a.click();
-                                a.remove();
-                                window.URL.revokeObjectURL(url);
-                                toast.success('PDF downloaded');
+                                if (downloadPdfFromResponse(res.data, `po-${po.po_number || po.id}.pdf`, res.headers['content-type'])) {
+                                  toast.success('PDF downloaded');
+                                }
                               } catch {
                                 toast.error('Failed to download PDF');
                               }
@@ -577,15 +572,9 @@ export default function PurchaseOrdersPage() {
                 onClick={async () => {
                   try {
                     const res = await adminApi.get(`/purchase-orders/${savedPoId}/pdf`, { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `po-${savedPoId}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    toast.success('PDF downloaded');
+                    if (downloadPdfFromResponse(res.data, `po-${savedPoId}.pdf`, res.headers['content-type'])) {
+                      toast.success('PDF downloaded');
+                    }
                   } catch {
                     toast.error('Failed to download PDF');
                   }
@@ -599,10 +588,9 @@ export default function PurchaseOrdersPage() {
                 onClick={async () => {
                   try {
                     const res = await adminApi.get(`/purchase-orders/${savedPoId}/pdf`, { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                    const w = window.open(url, '_blank');
-                    if (w) w.onload = () => w.print();
-                    toast.success('Opening print dialog');
+                    if (openPdfFromResponse(res.data, res.headers['content-type'])) {
+                      toast.success('Opening PDF for print');
+                    }
                   } catch {
                     toast.error('Failed to open PDF for printing');
                   }

@@ -6,10 +6,11 @@ import Category from '../models/Category';
 import SubCategory from '../models/SubCategory';
 import { authenticateAdmin, optionalAuthenticateAdmin, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
-import { parse as parseCsv } from 'csv-parse/sync';
 import { buildPreview, executeImport } from '../services/productImportService';
-import { assignCategoriesFromCsvRows, type CsvAssignRow } from '../services/categoryAssignmentFromCsv';
-import { generateItemId, backfillProductSkuAndBarcode } from '../utils/productCodes';
+import {
+  generateProductId,
+  migrateProductIdAndSku,
+} from '../utils/productCodes';
 
 const router = express.Router();
 
@@ -44,14 +45,14 @@ function toSlug(value: string): string {
 }
 
 router.get('/generate-id', authenticateAdmin, async (req, res) => {
-  const item_id = await generateItemId();
-  res.json({ item_id });
+  const product_id = await generateProductId();
+  res.json({ product_id, item_id: product_id });
 });
 
-/** One-time / maintenance: set missing SKUs and duplicate SKU into empty barcode for scanning. */
+/** One-time / maintenance: assign product_id + move UPCs into sku for full catalog. */
 router.post('/backfill-codes', authenticateAdmin, async (req, res) => {
   try {
-    const result = await backfillProductSkuAndBarcode();
+    const result = await migrateProductIdAndSku();
     res.json({
       message: 'Backfill complete',
       updated: result.updated,
@@ -137,6 +138,7 @@ router.get('/', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
         $or: [
           { name: { $regex: searchStr, $options: 'i' } },
           { description: { $regex: searchStr, $options: 'i' } },
+          { product_id: searchStr },
           { sku: searchStr },
           { barcode: searchStr },
           { plu: searchStr },
@@ -169,6 +171,7 @@ router.get('/', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
         id: product._id.toString(),
         name: product.name,
         slug: product.slug,
+        product_id: product.product_id,
         sku: product.sku,
         description: product.description,
         product_type: product.product_type || 'inventory',
@@ -212,13 +215,20 @@ router.get('/barcode/:barcode', authenticateAdmin, async (req, res) => {
   try {
     const code = req.params.barcode?.trim() || '';
     let product = await Product.findOne({
-      $and: [{ barcode: code }, CATALOG_VISIBLE_MATCH],
+      $and: [{ sku: code }, CATALOG_VISIBLE_MATCH],
     })
       .populate('category_id', 'name slug')
       .lean();
     if (!product) {
       product = await Product.findOne({
-        $and: [{ sku: code }, CATALOG_VISIBLE_MATCH],
+        $and: [{ product_id: code }, CATALOG_VISIBLE_MATCH],
+      })
+        .populate('category_id', 'name slug')
+        .lean();
+    }
+    if (!product) {
+      product = await Product.findOne({
+        $and: [{ barcode: code }, CATALOG_VISIBLE_MATCH],
       })
         .populate('category_id', 'name slug')
         .lean();
@@ -240,6 +250,7 @@ router.get('/barcode/:barcode', authenticateAdmin, async (req, res) => {
       price: p.price ?? 0,
       cost_price: p.cost_price != null ? Number(p.cost_price) : null,
       category_name: p.category_id?.name ?? '',
+      product_id: p.product_id,
       sku: p.sku,
       barcode: p.barcode,
     });
@@ -288,7 +299,7 @@ router.post('/import/preview', authenticateAdmin, upload.single('file'), async (
     return res.status(400).json({ error: 'No CSV file uploaded. Use form field name: file' });
   }
   try {
-    const result = buildPreview(req.file.buffer);
+    const result = await buildPreview(req.file.buffer);
     res.json(result);
   } catch (error: any) {
     console.error('Import preview error:', error);
@@ -350,7 +361,8 @@ router.post('/', authenticateAdmin, async (req: AuthRequest, res) => {
     const product = await Product.create({
       name: data.name,
       slug,
-      sku: data.sku || (await generateItemId()),
+      product_id: await generateProductId(),
+      sku: data.sku?.trim() || undefined,
       description: data.description,
       product_type: data.product_type || 'inventory',
       price,
@@ -398,6 +410,7 @@ router.put('/:id', authenticateAdmin, async (req: AuthRequest, res) => {
       image_url: z.union([z.string().url(), z.literal('')]).optional(),
       barcode: z.string().optional(),
       sku: z.string().optional(),
+      product_id: z.string().optional(),
       cost_price: z.number().min(0).optional(),
       stock_quantity: z.number().int().optional(),
       low_stock_threshold: z.number().int().min(0).optional(),
@@ -408,14 +421,12 @@ router.put('/:id', authenticateAdmin, async (req: AuthRequest, res) => {
     const existing = await Product.findById(req.params.id).lean();
     if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-    // Product IDs (SKU) are permanent. Once a product has a SKU, the value
-    // cannot be changed or regenerated by an update — it's the public
-    // identifier shown on the website and printed on labels.
-    if (data.sku !== undefined && (existing as any).sku && String((existing as any).sku).trim()) {
-      if (String(data.sku).trim() !== String((existing as any).sku).trim()) {
-        return res
-          .status(400)
-          .json({ error: 'Product ID (SKU) is permanent and cannot be changed once assigned.' });
+    // Product ID is permanent once assigned.
+    if (data.product_id !== undefined) {
+      const incoming = String(data.product_id).trim();
+      const current = String((existing as any).product_id || '').trim();
+      if (current && incoming && incoming !== current) {
+        return res.status(400).json({ error: 'Product ID cannot be changed once assigned.' });
       }
     }
 
@@ -432,11 +443,12 @@ router.put('/:id', authenticateAdmin, async (req: AuthRequest, res) => {
     const rest = { ...data };
     delete rest.category_id;
     delete rest.sub_category_id;
-    // Never allow PUT to overwrite an existing SKU. Only allow setting it if
-    // the product currently has no SKU at all (legacy data).
-    if ((existing as any).sku && String((existing as any).sku).trim()) {
-      delete (rest as any).sku;
+    // Never allow PUT to change product_id once set.
+    if ((existing as any).product_id && String((existing as any).product_id).trim()) {
+      delete (rest as any).product_id;
     }
+    delete (rest as any).barcode;
+    delete (rest as any).plu;
     Object.keys(rest).forEach((k) => {
       if ((rest as any)[k] !== undefined) update[k] = (rest as any)[k];
     });
@@ -565,26 +577,6 @@ router.post('/bulk-assign-category', authenticateAdmin, async (req: AuthRequest,
     if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message });
     console.error('Bulk assign category error:', error);
     res.status(500).json({ error: 'Failed to assign category' });
-  }
-});
-
-// Admin: Bulk-set categories from a CSV with columns matching final csv (name, slug, category_slug, sku, barcode, …)
-router.post('/assign-categories-csv', authenticateAdmin, upload.single('file'), async (req: AuthRequest, res) => {
-  if (!req.file?.buffer) {
-    return res.status(400).json({ error: 'No CSV uploaded. Use form field name: file' });
-  }
-  try {
-    const rows = parseCsv(req.file.buffer.toString('utf8'), {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    }) as CsvAssignRow[];
-    const dryRun = req.query.dry_run === '1' || req.query.dry_run === 'true';
-    const result = await assignCategoriesFromCsvRows(rows, dryRun);
-    res.json({ ...result, dryRun });
-  } catch (error: any) {
-    console.error('assign-categories-csv:', error);
-    res.status(500).json({ error: error.message || 'Failed to process CSV' });
   }
 });
 

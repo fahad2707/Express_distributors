@@ -1,12 +1,12 @@
 /**
- * CLI: assign categories from final csv.csv (same logic as POST /products/assign-categories-csv).
+ * CLI: assign categories from a master CSV (name, slug, category_slug, sku, …).
  *
  *   cd backend && MONGODB_URI="..." npx tsx src/db/assignCategoriesFromFinalCsv.ts
  *   FINAL_CSV_PATH=/path/to.csv DRY_RUN=1 npx tsx src/db/assignCategoriesFromFinalCsv.ts
  */
 import fs from 'fs';
 import path from 'path';
-import { parse } from 'csv-parse/sync';
+import { parseCsvRecords } from '../utils/csvParseRecords';
 import mongoose from 'mongoose';
 import connectDB from './connection';
 import { assignCategoriesFromCsvRows, type CsvAssignRow } from '../services/categoryAssignmentFromCsv';
@@ -30,7 +30,11 @@ async function main() {
 
   await connectDB();
   const text = fs.readFileSync(csvPath, 'utf8');
-  const rows = parse(text, { columns: true, skip_empty_lines: true, trim: true }) as CsvAssignRow[];
+  const rows = await parseCsvRecords<CsvAssignRow>(text, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  });
 
   const result = await assignCategoriesFromCsvRows(rows, dryRun);
   console.log(JSON.stringify(result, null, 2));

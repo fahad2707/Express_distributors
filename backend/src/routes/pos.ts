@@ -31,13 +31,10 @@ router.get('/products/search', authenticateAdmin, async (req: AuthRequest, res) 
     const code = String(q).trim();
     let query: any;
 
-    if (type === 'barcode') {
-      // Scanners often send the value stored on SKU/PLU; check all exact-match fields
-      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ barcode: code }, { sku: code }, { plu: code }] }] };
-    } else if (type === 'plu') {
-      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ plu: code }, { sku: code }, { barcode: code }] }] };
-    } else if (type === 'sku') {
-      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ sku: code }, { barcode: code }, { plu: code }] }] };
+    if (type === 'sku') {
+      query = { $and: [POS_CATALOG_ACTIVE, { $or: [{ sku: code }, { product_id: code }] }] };
+    } else if (type === 'product_id') {
+      query = { $and: [POS_CATALOG_ACTIVE, { product_id: code }] };
     } else {
       query = {
         $and: [
@@ -45,8 +42,7 @@ router.get('/products/search', authenticateAdmin, async (req: AuthRequest, res) 
           {
             $or: [
               { name: { $regex: q, $options: 'i' } },
-              { barcode: { $regex: q, $options: 'i' } },
-              { plu: { $regex: q, $options: 'i' } },
+              { product_id: { $regex: q, $options: 'i' } },
               { sku: { $regex: q, $options: 'i' } },
             ],
           },
@@ -63,8 +59,7 @@ router.get('/products/search', authenticateAdmin, async (req: AuthRequest, res) 
         price: p.price,
         cost_price: p.cost_price,
         stock_quantity: p.stock_quantity,
-        barcode: p.barcode,
-        plu: p.plu,
+        product_id: p.product_id,
         sku: p.sku,
         tax_rate: p.tax_rate || 0,
         image_url: p.image_url,
