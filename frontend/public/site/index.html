@@ -286,7 +286,7 @@ html.use-custom-cursor .hl-foot:hover{opacity:.95}
 .browse-top{opacity:.9}
 .browse-top:hover{opacity:1}
 /* Permanent product ID badge — pinned above the product image */
-.pc-id{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:3;display:inline-flex;align-items:center;padding:4px 10px 4px 8px;font-family:var(--body);font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--ink);background:var(--gold);border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5);pointer-events:none;text-transform:uppercase;line-height:1;white-space:nowrap}
+.pc-id{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;display:inline-flex;align-items:center;padding:4px 10px 4px 8px;font-family:var(--body);font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--ink);background:var(--gold);border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5);pointer-events:none;text-transform:uppercase;line-height:1;white-space:nowrap}
 .pc-id::before{content:'#';opacity:.55;margin-right:2px;font-weight:700}
 @media(max-width:768px){
   .pc-id{font-size:8.5px;padding:3px 8px;letter-spacing:.16em}
@@ -295,7 +295,9 @@ html.use-custom-cursor .hl-foot:hover{opacity:.95}
 .product-modal-ov.show{display:flex}
 .product-modal{position:relative;width:min(920px,calc(100vw - 20px));max-width:100%;max-height:min(96dvh,calc(100vh - 20px));overflow-y:auto;overflow-x:hidden;background:linear-gradient(180deg,var(--ink2),var(--ink));border:1px solid rgba(191,160,106,.28);box-shadow:0 20px 60px rgba(0,0,0,.55);border-radius:12px;margin:0 auto 16px;-webkit-overflow-scrolling:touch}
 .pm-body{display:flex;flex-direction:column;min-height:0}
-.pm-media{background:var(--ink3);min-height:min(52vh,420px);display:flex;align-items:center;justify-content:center;padding:20px 16px;flex-shrink:0}
+.pm-media{position:relative;background:var(--ink3);min-height:min(52vh,420px);display:flex;align-items:center;justify-content:center;padding:20px 16px;flex-shrink:0}
+.pm-id{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;display:inline-flex;align-items:center;padding:4px 10px 4px 8px;font-family:var(--body);font-size:9.5px;font-weight:800;letter-spacing:.18em;color:var(--ink);background:var(--gold);border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5);pointer-events:none;text-transform:uppercase;line-height:1;white-space:nowrap}
+.pm-id::before{content:'#';opacity:.55;margin-right:2px;font-weight:700}
 .pm-media img.pm-img,.pm-media img{max-width:100%;width:100%;height:auto;max-height:min(78vh,900px);object-fit:contain;display:block}
 .pm-fallback{font-family:var(--serif);font-size:clamp(48px,15vw,96px);color:var(--gold);opacity:.88}
 .pm-content{padding:22px 22px 32px;flex-shrink:0;border-top:1px solid rgba(191,160,106,.12)}
@@ -572,7 +574,7 @@ body.category-mode #homeContent{display:none}
 <div class="filters" id="filtBar"><button class="filt on" data-c="All" data-id="">All</button></div>
 <button type="button" class="filt-scroll-btn" id="filtNext" aria-label="Scroll categories right">›</button>
 </div>
-<div class="pgrid" id="pgrid"></div><div class="load-row" id="loadRow"><button class="btn-ghost" id="loadBtn">Load More →</button><button class="btn-ghost browse-top" id="browseTopBtn" type="button">Browse More ↑</button></div>
+<div class="pgrid" id="pgrid"></div><div class="load-row" id="loadRow"><button type="button" class="btn-ghost" id="loadBtn">Load More →</button><button class="btn-ghost browse-top" id="browseTopBtn" type="button">Browse More ↑</button></div>
 <div id="shopLoading" style="text-align:center;padding:40px 0;display:none"><div style="display:inline-block;width:28px;height:28px;border:2px solid var(--gold);border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite"></div><p style="margin-top:10px;font-size:12px;color:var(--fog)">Loading products…</p></div></section>
 <div style="height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)"></div>
 <section id="about"><div class="rvl"><div class="about-tag">Who We Are</div><h2 class="about-h2">Where <i>precision</i><br/>meets purpose</h2><p class="about-body">Express Distributors Inc. has been the silent engine behind hundreds of thriving businesses. We source, warehouse, and deliver products across every major industry — with meticulous attention to quality and timing.</p><div class="stat-grid"><div class="stat"><div class="stat-v">12+</div><div class="stat-k">Years Active</div></div><div class="stat"><div class="stat-v">500+</div><div class="stat-k">Client Partners</div></div><div class="stat"><div class="stat-v">98%</div><div class="stat-k">On-Time Rate</div></div><div class="stat"><div class="stat-v">1.3K+</div><div class="stat-k">Products Listed</div></div></div></div><div class="about-art-wrap rvr"><div class="about-mosaic" id="mosaic"></div><div class="about-float"><div class="af-lbl">Active Partners</div><div class="af-val">500+</div></div></div></section>
@@ -850,7 +852,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)stopHlAuto(
 window.addEventListener('resize',()=>{applyHighlightSizing();positionCards();spinWheel(false);});
 
 let PRODS=[],ALL_CATEGORIES=[],MIXED_ALL=[];
-let visCount=24,actFilt='All',actFiltCatId='',searchQuery='';
+let visCount=24,actFilt='All',actFiltCatId='',searchQuery='',shopRenderedCount=0;
 let catPageVisCount=48,activeCategorySlug=getActiveCategorySlug();
 function shuffleProducts(list){
   const arr=[...list];
@@ -919,31 +921,56 @@ function syncShopCardCartSlots(){
     slot.innerHTML=htmlPcCartSlot(p);
   });
 }
-function renderShop(){
+function buildProductCardHtml(p,pi){
+  const glow=p.g||pickGlow(pi);
+  const imgHtml=p.image_url
+    ?'<img src="'+p.image_url+'" alt="'+p.n.replace(/"/g,'&quot;')+'" class="pc-img-real" loading="lazy" decoding="async" fetchpriority="low" style="background:var(--ink2)">'
+    :'<span style="font-size:58px;position:relative;z-index:1">'+getFirstLetter(p.n)+'</span>';
+  const safeC=(p.c||'Uncategorized').replace(/&/g,'and');
+  const safeNC=p.n.replace(/&/g,'and').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  const pidAttr=String(p.id).replace(/"/g,'&quot;');
+  const idBadge=safeIdBadge(p.pid);
+  return '<div class="pc pc-click" onclick="openProductModal(\''+p.id+'\')"><div class="pc-img"><div class="pc-glow" style="background:radial-gradient(circle,'+glow+'44,transparent 70%)"></div>'+idBadge+'<button type="button" class="pc-wl" onclick="event.stopPropagation();addToWl(\''+p.id+'\',\''+safeNC+'\',\''+safeC.replace(/'/g,"\\'")+'\',0)">♡</button>'+imgHtml+'</div><div class="pc-body"><div class="pc-cat">'+safeC+'</div><div class="pc-stars">★★★★★</div><div class="pc-name">'+p.n+'</div><div class="pc-desc">'+(p.d||'')+'</div><div class="pc-foot"><div class="pc-rfq-tag">Quote on request</div><div class="pc-cart-slot" data-pid="'+pidAttr+'">'+htmlPcCartSlot(p)+'</div></div></div></div>';
+}
+function renderShop(opts){
+  const append=opts&&opts.append;
   const grid=document.getElementById('pgrid');
   const loadBtn=document.getElementById('loadBtn');
   if(!grid) return;
   const filtered=getFiltered();
-  const slice=filtered.slice(0,visCount);
-  if(slice.length===0){
+  const totalToShow=Math.min(visCount,filtered.length);
+  if(totalToShow===0){
+    shopRenderedCount=0;
     grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--fog)"><p style="font-size:16px;margin-bottom:8px">No products found</p><p style="font-size:12px">Products added from the admin panel will appear here automatically.</p></div>';
     if(loadBtn) loadBtn.style.display='none';
     return;
   }
-  grid.innerHTML=slice.map((p,pi)=>{
-    const glow=p.g||pickGlow(pi);
-    const imgHtml=p.image_url
-      ?'<img src="'+p.image_url+'" alt="'+p.n.replace(/"/g,'&quot;')+'" class="pc-img-real" loading="lazy" decoding="async" fetchpriority="low" style="background:var(--ink2)">'
-      :'<span style="font-size:58px;position:relative;z-index:1">'+getFirstLetter(p.n)+'</span>';
-    const safeC=(p.c||'Uncategorized').replace(/&/g,'and');
-    const safeNC=p.n.replace(/&/g,'and').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    const pidAttr=String(p.id).replace(/"/g,'&quot;');
-    const idBadge=safeIdBadge(p.pid);
-    return '<div class="pc pc-click" onclick="openProductModal(\''+p.id+'\')"><div class="pc-img"><div class="pc-glow" style="background:radial-gradient(circle,'+glow+'44,transparent 70%)"></div>'+idBadge+'<button class="pc-wl" onclick="event.stopPropagation();addToWl(\''+p.id+'\',\''+safeNC+'\',\''+safeC.replace(/'/g,"\\'")+'\',0)">♡</button>'+imgHtml+'</div><div class="pc-body"><div class="pc-cat">'+safeC+'</div><div class="pc-stars">★★★★★</div><div class="pc-name">'+p.n+'</div><div class="pc-desc">'+(p.d||'')+'</div><div class="pc-foot"><div class="pc-rfq-tag">Quote on request</div><div class="pc-cart-slot" data-pid="'+pidAttr+'">'+htmlPcCartSlot(p)+'</div></div></div></div>';
-  }).join('');
+  if(append&&shopRenderedCount>0&&shopRenderedCount<totalToShow){
+    const scrollY=window.scrollY;
+    const chunk=filtered.slice(shopRenderedCount,totalToShow);
+    grid.insertAdjacentHTML('beforeend',chunk.map((p,pi)=>buildProductCardHtml(p,shopRenderedCount+pi)).join(''));
+    shopRenderedCount=totalToShow;
+    if(loadBtn) loadBtn.style.display=filtered.length>visCount?'block':'none';
+    window.scrollTo(0,scrollY);
+    syncShopCardCartSlots();
+    return;
+  }
+  const slice=filtered.slice(0,totalToShow);
+  shopRenderedCount=totalToShow;
+  grid.innerHTML=slice.map((p,pi)=>buildProductCardHtml(p,pi)).join('');
   if(loadBtn) loadBtn.style.display=filtered.length>visCount?'block':'none';
 }
 
+/** Permanent 5-digit ID from API (product_id). */
+function resolveCatalogProductId(apiProduct){
+  if(!apiProduct) return '';
+  const raw=apiProduct.product_id!=null?apiProduct.product_id:(apiProduct.item_id!=null?apiProduct.item_id:'');
+  const s=String(raw).trim();
+  if(/^\d{5}$/.test(s)) return s;
+  const sku=String(apiProduct.sku||'').trim();
+  if(/^\d{5}$/.test(sku)) return sku;
+  return s;
+}
 function safeIdBadge(productId){
   if(productId==null) return '';
   const raw=String(productId).trim();
@@ -968,24 +995,28 @@ function getCategoryPageProducts(){
     return normText(p.c)===normText(cat.name||'');
   });
 }
-function renderProductCardsIntoGrid(grid,products,visibleCount){
+let catPageRenderedCount=0;
+function renderProductCardsIntoGrid(grid,products,visibleCount,opts){
   if(!grid)return;
-  const slice=products.slice(0,visibleCount);
-  if(slice.length===0){
+  const append=opts&&opts.append;
+  const totalToShow=Math.min(visibleCount,products.length);
+  if(totalToShow===0){
+    catPageRenderedCount=0;
     grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--fog)"><p style="font-size:16px;margin-bottom:8px">No products in this category</p><p style="font-size:12px">Check back soon or browse another category above.</p></div>';
     return;
   }
-  grid.innerHTML=slice.map((p,pi)=>{
-    const glow=p.g||pickGlow(pi);
-    const imgHtml=p.image_url
-      ?'<img src="'+p.image_url+'" alt="'+p.n.replace(/"/g,'&quot;')+'" class="pc-img-real" loading="lazy" decoding="async" fetchpriority="low" style="background:var(--ink2)">'
-      :'<span style="font-size:58px;position:relative;z-index:1">'+getFirstLetter(p.n)+'</span>';
-    const safeC=(p.c||'Uncategorized').replace(/&/g,'and');
-    const safeNC=p.n.replace(/&/g,'and').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    const pidAttr=String(p.id).replace(/"/g,'&quot;');
-    const idBadge=safeIdBadge(p.pid);
-    return '<div class="pc pc-click" onclick="openProductModal(\''+p.id+'\')"><div class="pc-img"><div class="pc-glow" style="background:radial-gradient(circle,'+glow+'44,transparent 70%)"></div>'+idBadge+'<button class="pc-wl" onclick="event.stopPropagation();addToWl(\''+p.id+'\',\''+safeNC+'\',\''+safeC.replace(/'/g,"\\'")+'\',0)">♡</button>'+imgHtml+'</div><div class="pc-body"><div class="pc-cat">'+safeC+'</div><div class="pc-stars">★★★★★</div><div class="pc-name">'+p.n+'</div><div class="pc-desc">'+(p.d||'')+'</div><div class="pc-foot"><div class="pc-rfq-tag">Quote on request</div><div class="pc-cart-slot" data-pid="'+pidAttr+'">'+htmlPcCartSlot(p)+'</div></div></div></div>';
-  }).join('');
+  if(append&&catPageRenderedCount>0&&catPageRenderedCount<totalToShow){
+    const scrollY=window.scrollY;
+    const chunk=products.slice(catPageRenderedCount,totalToShow);
+    grid.insertAdjacentHTML('beforeend',chunk.map((p,pi)=>buildProductCardHtml(p,catPageRenderedCount+pi)).join(''));
+    catPageRenderedCount=totalToShow;
+    window.scrollTo(0,scrollY);
+    syncShopCardCartSlots();
+    return;
+  }
+  const slice=products.slice(0,totalToShow);
+  catPageRenderedCount=totalToShow;
+  grid.innerHTML=slice.map((p,pi)=>buildProductCardHtml(p,pi)).join('');
 }
 function renderCatPageSlider(){
   const bar=document.getElementById('catPageFiltBar');
@@ -1011,7 +1042,7 @@ function renderCatPageSlider(){
     updateCatPageFiltScrollBtns();
   });
 }
-function renderCategoryPage(){
+function renderCategoryPage(opts){
   if(!isCategoryPage)return;
   const cat=findCategoryBySlug(activeCategorySlug);
   const titleEl=document.getElementById('catPageTitle');
@@ -1029,11 +1060,11 @@ function renderCategoryPage(){
       ? products.length+' product'+(products.length===1?'':'s')+' in this category. Scroll to explore the full range.'
       : 'No products listed in this category yet.';
   }
-  renderProductCardsIntoGrid(grid,products,catPageVisCount);
+  renderProductCardsIntoGrid(grid,products,catPageVisCount,opts);
   if(loadRow&&loadBtn){
     const showMore=products.length>catPageVisCount;
     loadRow.style.display=showMore?'flex':'none';
-    loadBtn.onclick=()=>{catPageVisCount+=24;renderCategoryPage();};
+    loadBtn.onclick=(e)=>{e.preventDefault();catPageVisCount+=24;renderCategoryPage({append:true});};
   }
   renderCatPageSlider();
   syncShopCardCartSlots();
@@ -1099,7 +1130,7 @@ if(filtPrevBtn)filtPrevBtn.addEventListener('click',()=>scrollFiltStep(-FILT_SCR
 if(filtNextBtn)filtNextBtn.addEventListener('click',()=>scrollFiltStep(FILT_SCROLL));
 if(filtBarEl)filtBarEl.addEventListener('scroll',updateFiltScrollBtns,{passive:true});
 window.addEventListener('resize',()=>{window.requestAnimationFrame(updateFiltScrollBtns);});
-document.getElementById('loadBtn').addEventListener('click',()=>{visCount+=12;renderShop();});
+document.getElementById('loadBtn').addEventListener('click',(e)=>{e.preventDefault();visCount+=12;renderShop({append:true});});
 const browseTopBtn=document.getElementById('browseTopBtn');
 if(browseTopBtn){
   browseTopBtn.addEventListener('click',()=>{
@@ -1143,7 +1174,7 @@ async function loadData(){
     PRODS=products.map((p,i)=>({
       id:p.id,n:replaceAmp(p.name||''),d:p.description||'',c:replaceAmp(p.category_name||'Uncategorized'),
       cid:p.category_id||'',cslug:p.category_slug||'',
-      pid:p.product_id||'',
+      pid:resolveCatalogProductId(p),
       p:Number(p.price)||0,image_url:p.image_url||'',g:pickGlow(i),
       stock_quantity:p.stock_quantity,sku:p.sku,tax_rate:Number(p.tax_rate)||0
     }));
@@ -1416,9 +1447,11 @@ function openProductModal(productId){
   if(cat) cat.textContent=(p.pid?('ID #'+p.pid+' · '):'')+(p.c||'Uncategorized');
   if(desc) desc.textContent=(p.d&&String(p.d).trim())?p.d:'Premium quality product from Express Distributors.';
   if(media){
-    media.innerHTML=p.image_url
+    const pmIdBadge=safeIdBadge(p.pid).replace('pc-id','pm-id');
+    const imgInner=p.image_url
       ? '<img class="pm-img" src="'+String(p.image_url).replace(/"/g,'&quot;')+'" alt="'+String(p.n||'Product').replace(/"/g,'&quot;')+'" decoding="async" loading="eager" style="background:var(--ink3)" />'
       : '<div class="pm-fallback">'+getFirstLetter(p.n)+'</div>';
+    media.innerHTML=pmIdBadge+imgInner;
   }
   if(actions){
     const safeC=(p.c||'Uncategorized').replace(/&/g,'and').replace(/'/g,"\\'");

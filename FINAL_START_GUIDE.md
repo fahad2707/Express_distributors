@@ -154,6 +154,7 @@ Your website is now:
 | **Root directory** is repo root (`.`, `./`, or empty) — **not** `frontend` | So root `vercel.json` is used and both services deploy. |
 | **`JWT_SECRET`** is a long random string (e.g. output of `openssl rand -hex 32`), **not** a command name | Wrong secret breaks **all** logins and admin tokens. |
 | **`MONGODB_URI`** points at the DB that actually has your catalog | Empty/wrong DB ⇒ **no products**. |
+| **`MONGODB_DB_NAME=test`** on Railway/Vercel (same as Atlas) | Catalog + product IDs live in **`test`**, not `express_distributors`. Wrong name ⇒ empty API or no `product_id` on site. |
 | **`NEXT_PUBLIC_API_URL`** = `/express/api` (or rely on Vercel build default) | Browser + static `/site` must hit Express, not a broken `/api` proxy. |
 | **Cloudinary** uses exact names: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Other names are ignored; uploads break. |
 | **`FRONTEND_URL`** = your real public site URL (required if you use a **custom domain**; `*.vercel.app` is allowed even without it) | CORS + email links. |

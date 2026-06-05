@@ -171,7 +171,9 @@ router.get('/', optionalAuthenticateAdmin, async (req: AuthRequest, res) => {
         id: product._id.toString(),
         name: product.name,
         slug: product.slug,
-        product_id: product.product_id,
+        product_id: product.product_id != null && String(product.product_id).trim() !== ''
+          ? String(product.product_id).trim()
+          : undefined,
         sku: product.sku,
         description: product.description,
         product_type: product.product_type || 'inventory',
@@ -443,9 +445,11 @@ router.put('/:id', authenticateAdmin, async (req: AuthRequest, res) => {
     const rest = { ...data };
     delete rest.category_id;
     delete rest.sub_category_id;
-    // Never allow PUT to change product_id once set.
-    if ((existing as any).product_id && String((existing as any).product_id).trim()) {
-      delete (rest as any).product_id;
+    // Client cannot set or change product_id; assign on first save if missing.
+    const existingPid = String((existing as any).product_id || '').trim();
+    delete (rest as any).product_id;
+    if (!existingPid) {
+      update.product_id = await generateProductId();
     }
     delete (rest as any).barcode;
     delete (rest as any).plu;

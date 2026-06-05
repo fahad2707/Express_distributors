@@ -487,12 +487,21 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
     setLoading(true);
     try {
       const payload = { ...formData, price: Number(formData.price) || 0 };
+      delete (payload as { product_id?: string }).product_id;
       if (product?.id) {
-        await adminApi.put(`/products/${product.id}`, payload);
-        toast.success('Product updated');
+        const { data } = await adminApi.put(`/products/${product.id}`, payload);
+        const assigned = data?.product_id ? String(data.product_id) : '';
+        if (assigned) {
+          setFormData((f) => ({ ...f, product_id: assigned }));
+        }
+        toast.success(assigned ? `Product updated (ID ${assigned})` : 'Product updated');
       } else {
-        await adminApi.post('/products', payload);
-        toast.success('Product created');
+        const { data } = await adminApi.post('/products', payload);
+        const assigned = data?.product_id ? String(data.product_id) : '';
+        if (assigned) {
+          setFormData((f) => ({ ...f, product_id: assigned }));
+        }
+        toast.success(assigned ? `Product created (ID ${assigned})` : 'Product created');
       }
       onSuccess();
       onClose();
@@ -561,16 +570,23 @@ export default function ProductModal({ product, onClose, onSuccess }: ProductMod
                 type="text"
                 value={formData.product_id ?? ''}
                 readOnly
-                placeholder={product?.id ? 'Assigned on save' : 'Auto-generated on save'}
+                placeholder={
+                  formData.product_id
+                    ? ''
+                    : product?.id
+                      ? 'Click Update to assign a permanent ID'
+                      : 'Auto-generated on save'
+                }
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-mono"
               />
-              {!product?.id && (
+              {!formData.product_id && (
                 <button
                   type="button"
                   onClick={async () => {
                     try {
                       const { data } = await adminApi.get('/products/generate-id');
                       setFormData((prev) => ({ ...prev, product_id: data.product_id || data.item_id || '' }));
+                      toast('Preview only — save the product to lock this ID', { icon: 'ℹ️' });
                     } catch {
                       toast.error('Failed to generate Product ID');
                     }
