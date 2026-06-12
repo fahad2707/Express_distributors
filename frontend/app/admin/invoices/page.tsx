@@ -42,7 +42,7 @@ export default function InvoicesPage() {
   const [receivePaymentCustomerId, setReceivePaymentCustomerId] = useState<string | undefined>();
   const [receivePaymentInvoiceId, setReceivePaymentInvoiceId] = useState<string | undefined>();
   const [summary, setSummary] = useState<{ totalPaid: number; totalUnpaid: number } | null>(null);
-  const [docTypeFilter, setDocTypeFilter] = useState<'all' | 'invoice' | 'quotation'>('all');
+  const [docTypeFilter, setDocTypeFilter] = useState<'all' | 'invoice' | 'quotation'>('invoice');
   const [createMode, setCreateMode] = useState<'invoice' | 'quotation'>('invoice');
 
   const fetchInvoices = async () => {
@@ -143,6 +143,31 @@ export default function InvoicesPage() {
         </div>
       </div>
 
+      <div className="flex border-b border-gray-200 mb-6">
+        <button
+          type="button"
+          onClick={() => setDocTypeFilter('invoice')}
+          className={`py-3 px-6 font-semibold text-sm border-b-2 transition-all ${
+            docTypeFilter === 'invoice'
+              ? 'border-[#0f766e] text-[#0f766e]'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          Invoices
+        </button>
+        <button
+          type="button"
+          onClick={() => setDocTypeFilter('quotation')}
+          className={`py-3 px-6 font-semibold text-sm border-b-2 transition-all ${
+            docTypeFilter === 'quotation'
+              ? 'border-[#0f766e] text-[#0f766e]'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          Quotations
+        </button>
+      </div>
+
       {summary !== null && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -186,14 +211,6 @@ export default function InvoicesPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f766e] focus:border-[#0f766e]"
             />
           </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-          <select value={docTypeFilter} onChange={(e) => setDocTypeFilter(e.target.value as 'all' | 'invoice' | 'quotation')} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <option value="all">All</option>
-            <option value="invoice">Invoices only</option>
-            <option value="quotation">Quotations only</option>
-          </select>
         </div>
       </div>
 

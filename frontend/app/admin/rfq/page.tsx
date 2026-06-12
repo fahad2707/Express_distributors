@@ -26,6 +26,8 @@ interface RFQItem {
   category_name?: string;
   image_url?: string;
   quantity: number;
+  price?: number;
+  cost_price?: number;
 }
 
 interface RFQ {
@@ -453,6 +455,8 @@ export default function AdminRFQPage() {
                         <th className="text-left py-2 px-3 font-medium">#</th>
                         <th className="text-left py-2 px-3 font-medium">Product</th>
                         <th className="text-left py-2 px-3 font-medium">Category</th>
+                        <th className="text-right py-2 px-3 font-medium">Cost Price</th>
+                        <th className="text-right py-2 px-3 font-medium">Price</th>
                         <th className="text-right py-2 px-3 font-medium">Qty</th>
                       </tr>
                     </thead>
@@ -462,6 +466,12 @@ export default function AdminRFQPage() {
                           <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
                           <td className="py-2 px-3 text-gray-900">{it.product_name}</td>
                           <td className="py-2 px-3 text-gray-600">{it.category_name || '—'}</td>
+                          <td className="py-2 px-3 text-right text-gray-600">
+                            {it.cost_price != null ? `$${it.cost_price.toFixed(2)}` : '—'}
+                          </td>
+                          <td className="py-2 px-3 text-right text-gray-900 font-medium">
+                            {it.price != null ? `$${it.price.toFixed(2)}` : '—'}
+                          </td>
                           <td className="py-2 px-3 text-right font-semibold">{it.quantity}</td>
                         </tr>
                       ))}

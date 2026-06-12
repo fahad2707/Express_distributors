@@ -558,7 +558,22 @@ export default function POSPage() {
                           />
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-right flex items-center justify-end gap-1">
+                          {(() => {
+                            const effectivePrice = item.product.price - (item.discount / item.quantity);
+                            const cost = item.product.cost_price;
+                            if (cost != null && effectivePrice < cost * 1.05) {
+                              return (
+                                <span
+                                  className="text-yellow-500 font-bold text-sm cursor-help select-none"
+                                  title={`Profit margin is below 5%. Minimum required effective price: $${(cost * 1.05).toFixed(2)}`}
+                                >
+                                  ⚠️
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                           <p className="text-sm font-bold text-primary-600">
                             ${lineTotal.toFixed(2)}
                             {item.discount > 0 && (

@@ -8,6 +8,7 @@ export interface ProductOption {
   name: string;
   price?: number;
   cost_price?: number;
+  product_id?: string;
   sku?: string;
   stock_quantity?: number;
   category_name?: string;
@@ -58,6 +59,7 @@ export default function SearchableProductDropdown({
         (p) =>
           p.name.toLowerCase().includes(q) ||
           (p.sku && p.sku.toLowerCase().includes(q)) ||
+          (p.product_id && p.product_id.toLowerCase().includes(q)) ||
           p.id.toLowerCase().includes(q),
       )
     : products;
@@ -68,7 +70,11 @@ export default function SearchableProductDropdown({
       const code = search.trim();
       if (!code) return;
       const exact = products.find(
-        (p) => p.sku === code || p.id === code || p.name.toLowerCase() === code.toLowerCase(),
+        (p) =>
+          p.sku === code ||
+          p.product_id === code ||
+          p.id === code ||
+          p.name.toLowerCase() === code.toLowerCase(),
       );
       if (exact) {
         onSelect(exact);
@@ -155,6 +161,7 @@ export default function SearchableProductDropdown({
               >
                 <span className="truncate">
                   {p.name}
+                  {p.product_id ? <span className="text-teal-600 text-xs ml-1 font-semibold">#{p.product_id}</span> : ''}
                   {p.sku ? <span className="text-gray-400 text-xs ml-1">({p.sku})</span> : ''}
                 </span>
                 <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">

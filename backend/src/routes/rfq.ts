@@ -146,7 +146,12 @@ router.get('/', authenticateAdmin, async (req: AuthRequest, res) => {
     }
 
     const [rfqs, total, pending, quoted] = await Promise.all([
-      RFQ.find(query).sort({ created_at: -1 }).skip(skip).limit(Number(limit)).lean(),
+      RFQ.find(query)
+        .populate({ path: 'items.product_id', select: 'price cost_price product_id sku' })
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
       RFQ.countDocuments(query),
       RFQ.countDocuments({ status: 'pending' }),
       RFQ.countDocuments({ status: 'quoted' }),
@@ -163,11 +168,13 @@ router.get('/', authenticateAdmin, async (req: AuthRequest, res) => {
         customer_company: r.customer_company,
         customer_comments: r.customer_comments,
         items: (r.items || []).map((it: any) => ({
-          product_id: it.product_id ? String(it.product_id) : null,
+          product_id: it.product_id && it.product_id._id ? String(it.product_id._id) : (it.product_id ? String(it.product_id) : null),
           product_name: it.product_name,
           category_name: it.category_name,
           image_url: it.image_url,
           quantity: it.quantity,
+          price: it.product_id && typeof it.product_id === 'object' ? it.product_id.price : undefined,
+          cost_price: it.product_id && typeof it.product_id === 'object' ? it.product_id.cost_price : undefined,
         })),
         item_count: (r.items || []).reduce((s: number, it: any) => s + (it.quantity || 0), 0),
         quotation_id: r.quotation_id ? String(r.quotation_id) : null,
@@ -196,7 +203,9 @@ router.get('/:id', authenticateAdmin, async (req: AuthRequest, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(404).json({ error: 'RFQ not found' });
     }
-    const r: any = await RFQ.findById(req.params.id).lean();
+    const r: any = await RFQ.findById(req.params.id)
+      .populate({ path: 'items.product_id', select: 'price cost_price product_id sku' })
+      .lean();
     if (!r) return res.status(404).json({ error: 'RFQ not found' });
     res.json({
       id: r._id.toString(),
@@ -208,11 +217,13 @@ router.get('/:id', authenticateAdmin, async (req: AuthRequest, res) => {
       customer_company: r.customer_company,
       customer_comments: r.customer_comments,
       items: (r.items || []).map((it: any) => ({
-        product_id: it.product_id ? String(it.product_id) : null,
+        product_id: it.product_id && it.product_id._id ? String(it.product_id._id) : (it.product_id ? String(it.product_id) : null),
         product_name: it.product_name,
         category_name: it.category_name,
         image_url: it.image_url,
         quantity: it.quantity,
+        price: it.product_id && typeof it.product_id === 'object' ? it.product_id.price : undefined,
+        cost_price: it.product_id && typeof it.product_id === 'object' ? it.product_id.cost_price : undefined,
       })),
       quotation_id: r.quotation_id ? String(r.quotation_id) : null,
       quotation_number: r.quotation_number,

@@ -114,14 +114,14 @@ export default function CategoryPage() {
                     />
                     {product.sku && (
                       <span
-                        className="absolute top-3 left-1/2 -translate-x-1/2 bg-amber-300 text-slate-900 text-[10px] font-extrabold tracking-[0.18em] uppercase px-2.5 py-1 rounded-full shadow-md"
+                        className="absolute top-3 right-3 bg-amber-300 text-slate-900 text-[10px] font-extrabold tracking-[0.18em] uppercase px-2.5 py-1 rounded-full shadow-md"
                         aria-label={`Product ID ${product.sku}`}
                       >
                         #{product.sku}
                       </span>
                     )}
                     {product.stock_quantity <= 10 && product.stock_quantity > 0 && (
-                      <div className="absolute top-3 right-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                      <div className="absolute top-3 left-3 bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                         Low Stock
                       </div>
                     )}
@@ -130,7 +130,7 @@ export default function CategoryPage() {
                   <div className="h-64 bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center relative">
                     {product.sku && (
                       <span
-                        className="absolute top-3 left-1/2 -translate-x-1/2 bg-amber-300 text-slate-900 text-[10px] font-extrabold tracking-[0.18em] uppercase px-2.5 py-1 rounded-full shadow-md"
+                        className="absolute top-3 right-3 bg-amber-300 text-slate-900 text-[10px] font-extrabold tracking-[0.18em] uppercase px-2.5 py-1 rounded-full shadow-md"
                         aria-label={`Product ID ${product.sku}`}
                       >
                         #{product.sku}

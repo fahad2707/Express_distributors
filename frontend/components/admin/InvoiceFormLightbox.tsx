@@ -33,6 +33,8 @@ interface Product {
   category_name?: string;
   category_slug?: string;
   stock_quantity?: number;
+  product_id?: string;
+  sku?: string;
 }
 
 interface LineItem {
@@ -151,6 +153,7 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
     } else {
       const docType = initialDocumentType || 'invoice';
       setDocumentType(docType);
+      setInvoiceDate(new Date().toISOString().slice(0, 10));
       adminApi.get('/invoices/generate-number', { params: { type: docType } }).then((r) => {
         const num = r.data.invoice_number || '';
         setInvoiceNumber(/^INV#\d+|^QTN#\d+/.test(num) ? num : (docType === 'quotation' ? 'QTN#001' : 'INV#001'));
@@ -658,14 +661,30 @@ export default function InvoiceFormLightbox({ isOpen, onClose, onSaved, editId, 
                             <td className="py-2 px-4 text-right text-gray-600">{hasProduct && (() => { const c = getLineCostPrice(line); return typeof c === 'number' ? `$${c.toFixed(2)}` : '—'; })()}</td>
                             <td className="py-2 px-4 text-right">
                               {hasProduct ? (
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={0.01}
-                                  value={line.price}
-                                  onChange={(e) => updateLine(idx, 'price', e.target.value)}
-                                  className="w-20 text-right border border-gray-300 rounded px-2 py-1"
-                                />
+                                <div className="flex items-center justify-end gap-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={0.01}
+                                    value={line.price}
+                                    onChange={(e) => updateLine(idx, 'price', e.target.value)}
+                                    className="w-20 text-right border border-gray-300 rounded px-2 py-1"
+                                  />
+                                  {(() => {
+                                    const cost = getLineCostPrice(line);
+                                    if (cost != null && line.price < cost * 1.05) {
+                                      return (
+                                        <span
+                                          className="text-yellow-500 font-bold text-base cursor-help select-none"
+                                          title={`Profit margin is below 5%. Minimum required selling price: $${(cost * 1.05).toFixed(2)}`}
+                                        >
+                                          ⚠️
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
                               ) : (
                                 <span className="text-gray-400">—</span>
                               )}
